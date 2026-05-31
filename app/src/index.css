@@ -1,0 +1,128 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 33% 97%;
+    --foreground: 20 14% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 20 14% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 14% 10%;
+    --primary: 187 85% 31%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 25 95% 53%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 40 23% 93%;
+    --muted-foreground: 25 5% 45%;
+    --accent: 40 23% 93%;
+    --accent-foreground: 20 14% 10%;
+    --destructive: 348 90% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 30 6% 90%;
+    --input: 30 6% 85%;
+    --ring: 187 85% 31%;
+    --radius: 0.75rem;
+    --sidebar-background: 40 33% 95%;
+    --sidebar-foreground: 20 14% 10%;
+    --sidebar-primary: 187 85% 31%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 40 23% 93%;
+    --sidebar-accent-foreground: 20 14% 10%;
+    --sidebar-border: 30 6% 90%;
+    --sidebar-ring: 187 85% 31%;
+
+    --bg-primary: #FEFCF6;
+    --bg-sidebar: #FAF5EB;
+    --bg-card: #FFFFFF;
+    --bg-hover: #F5EFE3;
+    --text-primary: #1C1917;
+    --text-secondary: #78716C;
+    --text-muted: #A8A29E;
+    --accent-primary: #0E7490;
+    --accent-primary-hover: #155E75;
+    --accent-secondary: #F97316;
+    --accent-tertiary: #F43F5E;
+    --border-light: #E7E5E4;
+    --border-medium: #D6D3D1;
+    --success: #22C55E;
+    --warning: #EAB308;
+    --chart-1: #0E7490;
+    --chart-2: #F97316;
+    --chart-3: #F43F5E;
+    --chart-4: #8B5CF6;
+    --chart-5: #10B981;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    font-family: 'Geist', sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+@layer utilities {
+  .font-heading {
+    font-family: 'Playfair Display', serif;
+  }
+  .font-body {
+    font-family: 'Geist', sans-serif;
+  }
+  .font-mono {
+    font-family: 'Geist', monospace;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Animation keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+.animate-pulse-slow {
+  animation: pulse 1.5s ease-in-out infinite;
+}

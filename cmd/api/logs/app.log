@@ -1,0 +1,18 @@
+{"level":"info","time":"2025-11-28T13:09:44+05:00","message":"Запуск http сервера на порту :8080"}
+{"level":"info","time":"2025-11-28T13:24:26+05:00","message":"Запуск http сервера на порту :8080"}
+{"level":"info","time":"2025-11-28T13:32:32+05:00","message":"Запуск http сервера на порту :8080"}
+{"level":"info","time":"2025-11-28T13:34:09+05:00","message":"Запуск http сервера на порту :8080"}
+{"level":"error","error":"s.repo.UpdateRecTransaction error: exec error: ОШИБКА: неверное значение для перечисления category_type_enum: \"\" (SQLSTATE 22P02)","time":"2025-11-28T13:37:04+05:00","message":"internal error"}
+{"level":"error","error":"s.repo.UpdateRecTransaction error: exec error: ОШИБКА: неверное значение для перечисления category_type_enum: \"\" (SQLSTATE 22P02)","time":"2025-11-28T13:37:48+05:00","message":"internal error"}
+{"level":"info","time":"2025-11-28T13:40:20+05:00","message":"Запуск http сервера на порту :8080"}
+{"level":"info","time":"2025-11-28T13:45:27+05:00","message":"Запуск http сервера на порту :8080"}
+{"level":"info","time":"2025-11-29T15:46:53+05:00","message":"Запуск http сервера на порту :8080"}
+{"level":"info","time":"2025-11-29T15:55:41+05:00","message":"Запуск http сервера на порту :8080"}
+{"level":"info","time":"2025-11-29T15:57:25+05:00","message":"Запуск http сервера на порту :8080"}
+{"level":"error","error":"subcategory not found","time":"2025-11-29T16:00:06+05:00","message":"internal error"}
+{"level":"info","time":"2025-11-29T16:23:34+05:00","message":"Запуск http сервера на порту :8080"}
+{"level":"info","time":"2025-11-29T16:30:26+05:00","message":"Запуск http сервера на порту :8080"}
+{"level":"info","time":"2025-11-29T16:37:37+05:00","message":"Запуск http сервера на порту :8080"}
+{"level":"info","time":"2025-11-29T16:46:08+05:00","message":"Запуск http сервера на порту :8080"}
+{"level":"info","time":"2025-11-29T16:49:56+05:00","message":"Запуск http сервера на порту :8080"}
+{"level":"info","time":"2025-11-29T17:23:54+05:00","message":"Запуск http сервера на порту :8080"}
