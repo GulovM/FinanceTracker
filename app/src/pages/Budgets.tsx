@@ -4,6 +4,10 @@ import {
   getBudgets,
   getBudgetSummary,
   createBudget,
+  updateBudget,
+  deleteBudget,
+  addBudgetCategories,
+  removeBudgetCategory,
   getCategories,
   getTransactions,
 } from "@/lib/api";
@@ -13,6 +17,7 @@ import {
   Plus,
   Target,
   X,
+  Trash2,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -25,6 +30,8 @@ export default function Budgets() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [budgetLimit, setBudgetLimit] = useState("");
+  const [categoryToAdd, setCategoryToAdd] = useState("");
   const queryClient = useQueryClient();
 
   const { data: budgets = [] } = useQuery({
@@ -94,6 +101,45 @@ export default function Budgets() {
     },
   });
 
+  const updateMut = useMutation({
+    mutationFn: ({ id, amountLimit }: { id: number; amountLimit: number }) =>
+      updateBudget(id, {
+        name: `Бюджет ${month}/${year}`,
+        periodStart,
+        periodEnd,
+        amountLimit,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['budget-summary'] });
+    },
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: deleteBudget,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['budget-summary'] });
+    },
+  });
+
+  const addCategoryMut = useMutation({
+    mutationFn: ({ id, categoryId }: { id: number; categoryId: number }) =>
+      addBudgetCategories(id, [categoryId]),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      setCategoryToAdd("");
+    },
+  });
+
+  const removeCategoryMut = useMutation({
+    mutationFn: ({ id, categoryId }: { id: number; categoryId: number }) =>
+      removeBudgetCategory(id, categoryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+    },
+  });
+
   const [newBudget, setNewBudget] = useState({
     totalLimit: "",
     categoryLimits: [] as { categoryId: number; limit: string }[],
@@ -135,7 +181,7 @@ export default function Budgets() {
   } : null;
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
       {/* Period Selector */}
       <div className="flex items-center gap-3">
         <select
@@ -246,6 +292,65 @@ export default function Budgets() {
                 )}
               </div>
             </div>
+
+            <div className="mt-6 pt-6 border-t border-[var(--border-light)] space-y-3">
+              <div className="flex flex-wrap gap-3">
+                <Input
+                  type="number"
+                  min={0}
+                  value={budgetLimit === "" ? String(budget.totalLimit) : budgetLimit}
+                  onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
+                  onChange={(e) => setBudgetLimit(e.target.value)}
+                  className="h-10 rounded-xl max-w-[180px]"
+                />
+                <Button
+                  onClick={() => currentBudget && updateMut.mutate({
+                    id: currentBudget.id,
+                    amountLimit: Number(budgetLimit === "" ? budget.totalLimit : budgetLimit),
+                  })}
+                  disabled={updateMut.isPending}
+                  className="h-10 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white"
+                >
+                  Сохранить лимит
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    if (currentBudget && confirm("Удалить этот бюджет?")) {
+                      deleteMut.mutate(currentBudget.id);
+                    }
+                  }}
+                  disabled={deleteMut.isPending}
+                  className="h-10 rounded-xl"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Удалить
+                </Button>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <select
+                  value={categoryToAdd}
+                  onChange={(e) => setCategoryToAdd(e.target.value)}
+                  className="h-10 px-3 rounded-xl border border-[var(--border-medium)] text-sm bg-white"
+                >
+                  <option value="">Добавить категорию</option>
+                  {categories
+                    .filter((category) => !currentBudget?.categoryIds.includes(category.id))
+                    .map((category) => (
+                      <option key={category.id} value={category.id}>{category.name}</option>
+                    ))}
+                </select>
+                <Button
+                  variant="outline"
+                  onClick={() => currentBudget && addCategoryMut.mutate({ id: currentBudget.id, categoryId: Number(categoryToAdd) })}
+                  disabled={!categoryToAdd || addCategoryMut.isPending}
+                  className="h-10 rounded-xl border-[var(--border-medium)]"
+                >
+                  Добавить
+                </Button>
+              </div>
+            </div>
           </motion.div>
 
           {/* Category Budgets */}
@@ -267,6 +372,14 @@ export default function Budgets() {
                     limit={budget.totalLimit}
                     color={cat.color ?? undefined}
                   />
+                  <div className="flex justify-end -mt-2">
+                    <button
+                      onClick={() => currentBudget && removeCategoryMut.mutate({ id: currentBudget.id, categoryId: cat.id })}
+                      className="text-xs text-[var(--text-muted)] hover:text-[var(--accent-tertiary)]"
+                    >
+                      Убрать из бюджета
+                    </button>
+                  </div>
                 </motion.div>
               ))}
             </div>
@@ -286,12 +399,14 @@ export default function Budgets() {
               <div className="relative">
                 <Input
                   type="number"
+                  min={0}
                   value={newBudget.totalLimit}
+                  onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
                   onChange={(e) => setNewBudget({ ...newBudget, totalLimit: e.target.value })}
                   placeholder="100000"
                   className="h-11 rounded-xl pr-12"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)]">₽</span>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)]">TJS</span>
               </div>
             </div>
 
@@ -325,7 +440,9 @@ export default function Budgets() {
                     <div className="relative w-[120px]">
                       <Input
                         type="number"
+                        min={0}
                         value={cl.limit}
+                        onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
                         onChange={(e) => {
                           const updated = [...newBudget.categoryLimits];
                           updated[idx].limit = e.target.value;
@@ -334,7 +451,7 @@ export default function Budgets() {
                         placeholder="Лимит"
                         className="h-10 rounded-xl pr-8"
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--text-muted)]">₽</span>
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--text-muted)]">TJS</span>
                     </div>
                     <button
                       onClick={() => {

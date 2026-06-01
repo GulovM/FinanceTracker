@@ -187,7 +187,7 @@ func (r *Repository) GetTransactionByID(ctx context.Context, userID, id int) (*d
 	return transaction.ToEntity(), nil
 }
 
-func (r *Repository) createTransaction(ctx context.Context, runner RowGetter, createTransaction *domain.CreateTransaction) error {
+func (r *Repository) createTransaction(ctx context.Context, runner RowGetter, createTransaction *domain.CreateTransaction) (int, error) {
 	Trquery := `
 	insert into transactions (
 		user_id, account_id, category_id, subcategory_id, merchant_id,
@@ -212,7 +212,7 @@ func (r *Repository) createTransaction(ctx context.Context, runner RowGetter, cr
 		createTransaction.TransferID,
 	).Scan(&txID)
 	if err != nil {
-		return exec_err(err)
+		return 0, exec_err(err)
 	}
 
 	insertTagQuery := `
@@ -224,19 +224,19 @@ func (r *Repository) createTransaction(ctx context.Context, runner RowGetter, cr
 		for _, tagID := range createTransaction.TagIDs {
 			_, err = runner.Exec(ctx, insertTagQuery, txID, tagID)
 			if err != nil {
-				return exec_err(err)
+				return 0, exec_err(err)
 			}
 		}
 	}
 
-	return nil
+	return txID, nil
 }
 
-func (r *Repository) CreateTransaction(ctx context.Context, createTransaction *domain.CreateTransaction) error {
+func (r *Repository) CreateTransaction(ctx context.Context, createTransaction *domain.CreateTransaction) (int, error) {
 	return r.createTransaction(ctx, r.postgres, createTransaction)
 }
 
-func (r *Repository) CreateTransactionTx(ctx context.Context, tx pgx.Tx, createTransaction *domain.CreateTransaction) error {
+func (r *Repository) CreateTransactionTx(ctx context.Context, tx pgx.Tx, createTransaction *domain.CreateTransaction) (int, error) {
 	return r.createTransaction(ctx, tx, createTransaction)
 }
 

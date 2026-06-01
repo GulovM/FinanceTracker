@@ -21,7 +21,7 @@ type SavingGoal struct {
 type GoalContribution struct {
 	ID            int       `json:"id"`
 	GoalID        int       `json:"goal_id"`
-	TransactionID int       `json:"transaction_id"`
+	TransactionID *int      `json:"transaction_id"`
 	Amount        float64   `json:"amount"`
 	CreatedAt     time.Time `json:"created_at"`
 }

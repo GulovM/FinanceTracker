@@ -14,8 +14,8 @@ import {
   ChevronRight,
   Wallet as WalletIcon,
   LogOut,
+  X,
 } from "lucide-react";
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const navGroups = [
@@ -45,29 +45,53 @@ const navGroups = [
   },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  collapsed: boolean;
+  onCollapsedChange: (v: boolean) => void;
+  mobileOpen: boolean;
+  onMobileClose: () => void;
+}
+
+export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen, onMobileClose }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const [collapsed, setCollapsed] = useState(false);
+
+  const handleNavClick = (path: string) => {
+    navigate(path);
+    onMobileClose();
+  };
 
   return (
     <aside
       className={cn(
         "h-screen bg-[var(--bg-sidebar)] border-r border-[var(--border-light)] flex flex-col transition-all duration-300 ease-in-out fixed left-0 top-0 z-40",
-        collapsed ? "w-[72px]" : "w-[260px]"
+        // Mobile: off-screen unless open
+        mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+        // Width: always 260px on mobile, dynamic on desktop
+        collapsed ? "lg:w-[72px] w-[260px]" : "w-[260px]"
       )}
     >
-      {/* Logo */}
-      <div className="px-5 pt-6 pb-4 flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)] flex items-center justify-center flex-shrink-0">
-          <WalletIcon className="w-4.5 h-4.5 text-white" />
+      {/* Logo + mobile close button */}
+      <div className="px-5 pt-6 pb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)] flex items-center justify-center flex-shrink-0">
+            <WalletIcon className="w-4 h-4 text-white" />
+          </div>
+          {!collapsed && (
+            <span className="font-heading text-xl font-semibold text-[var(--accent-primary)] tracking-tight">
+              FinTrack
+            </span>
+          )}
         </div>
-        {!collapsed && (
-          <span className="font-heading text-xl font-semibold text-[var(--accent-primary)] tracking-tight">
-            FinTrack
-          </span>
-        )}
+        {/* Close button — mobile only */}
+        <button
+          onClick={onMobileClose}
+          className="lg:hidden w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors"
+          aria-label="Закрыть меню"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
 
       <div className="mx-4 border-b border-[var(--border-light)]" />
@@ -89,7 +113,7 @@ export default function Sidebar() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => navigate(item.path)}
+                  onClick={() => handleNavClick(item.path)}
                   className={cn(
                     "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 mb-0.5 relative",
                     isActive
@@ -147,10 +171,10 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Collapse Toggle */}
+      {/* Collapse Toggle — desktop only */}
       <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white border border-[var(--border-light)] shadow-sm flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors z-50"
+        onClick={() => onCollapsedChange(!collapsed)}
+        className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white border border-[var(--border-light)] shadow-sm items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors z-50"
       >
         {collapsed ? (
           <ChevronRight className="w-3 h-3" />

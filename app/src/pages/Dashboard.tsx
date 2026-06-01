@@ -46,10 +46,21 @@ const CHART_COLORS = ["#0E7490", "#F97316", "#F43F5E", "#8B5CF6", "#10B981", "#7
 export default function Dashboard() {
   const navigate = useNavigate();
 
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString().split('T')[0];
-  const today = now.toISOString().split('T')[0];
+  const { currentYear, currentMonth, currentDay, monthStart, sixMonthsAgo, today } = useMemo(() => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const localDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return {
+      currentYear: now.getFullYear(),
+      currentMonth: now.getMonth(),
+      currentDay: now.getDate(),
+      monthStart: localDate(new Date(now.getFullYear(), now.getMonth(), 1)),
+      sixMonthsAgo: localDate(new Date(now.getFullYear(), now.getMonth() - 5, 1)),
+      today: localDate(tomorrow),
+    };
+  }, []);
 
   const { data: accounts = [], isLoading: accLoading } = useQuery({
     queryKey: ['accounts'],
@@ -86,9 +97,9 @@ export default function Dashboard() {
     return budgets.find(b => {
       if (!b.periodStart) return false;
       const d = new Date(b.periodStart);
-      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
     }) ?? null;
-  }, [budgets, now]);
+  }, [budgets, currentYear, currentMonth]);
 
   const { data: budgetSummary } = useQuery({
     queryKey: ['budget-summary', currentBudget?.id],
@@ -146,15 +157,15 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="p-8">
-        <div className="grid grid-cols-4 gap-5 mb-6">
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-6">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-32 bg-[var(--bg-hover)] rounded-2xl animate-pulse-slow" />
+            <div key={i} className="h-28 sm:h-32 bg-[var(--bg-hover)] rounded-2xl animate-pulse-slow" />
           ))}
         </div>
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-64 bg-[var(--bg-hover)] rounded-2xl animate-pulse-slow" />
+            <div key={i} className="h-48 sm:h-64 bg-[var(--bg-hover)] rounded-2xl animate-pulse-slow" />
           ))}
         </div>
       </div>
@@ -174,7 +185,7 @@ export default function Dashboard() {
   }));
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
       {/* Hero Section */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
@@ -200,7 +211,7 @@ export default function Dashboard() {
       </motion.div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
         <MetricCard
           label="Общий баланс"
           value={totalBalance}
@@ -228,7 +239,7 @@ export default function Dashboard() {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6">
         {/* Left Column - Charts */}
         <div className="lg:col-span-3 space-y-6">
           {/* Expenses by Category */}
@@ -236,16 +247,16 @@ export default function Dashboard() {
             <h3 className="font-heading text-lg font-medium text-[var(--text-primary)] mb-4">
               Расходы по категориям
             </h3>
-            <div className="flex items-center gap-8">
-              <div className="w-[200px] h-[200px]">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8">
+              <div className="w-full sm:w-[200px] h-[180px] sm:h-[200px] flex-shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={donutData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={55}
-                      outerRadius={90}
+                      innerRadius={50}
+                      outerRadius={80}
                       paddingAngle={2}
                       dataKey="value"
                     >
@@ -265,15 +276,15 @@ export default function Dashboard() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-2">
+              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
                 {donutData.map((item, i) => (
-                  <div key={i} className="flex items-center gap-2">
+                  <div key={i} className="flex items-center gap-2 min-w-0">
                     <div
                       className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                       style={{ backgroundColor: item.color }}
                     />
                     <span className="text-xs text-[var(--text-secondary)] truncate">{item.name}</span>
-                    <span className="text-xs font-mono text-[var(--text-muted)] ml-auto">
+                    <span className="text-xs font-mono text-[var(--text-muted)] ml-auto flex-shrink-0">
                       {formatCurrency(item.value)}
                     </span>
                   </div>
@@ -372,7 +383,7 @@ export default function Dashboard() {
             </h3>
             <div className="space-y-3">
               {recurring.filter(r => r.isActive).slice(0, 4).map((rec) => {
-                const isOverdue = rec.dayOfMonth ? rec.dayOfMonth < new Date().getDate() : false;
+                const isOverdue = rec.dayOfMonth ? rec.dayOfMonth < currentDay : false;
                 return (
                   <div
                     key={rec.id}

@@ -1,6 +1,7 @@
 import { formatCurrency, formatDateShort } from "@/lib/utils";
 import * as LucideIcons from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 interface TransactionRowProps {
   type: string;
@@ -13,6 +14,7 @@ interface TransactionRowProps {
   accountName?: string | null;
   accountColor?: string | null;
   onClick?: () => void;
+  action?: ReactNode;
 }
 
 const iconMap = LucideIcons as unknown as Record<string, LucideIcon>;
@@ -28,6 +30,7 @@ export default function TransactionRow({
   accountName,
   accountColor,
   onClick,
+  action,
 }: TransactionRowProps) {
   const numAmount = typeof amount === 'string' ? Number(amount) : amount;
   const iconName = categoryIcon || "circle";
@@ -87,6 +90,8 @@ export default function TransactionRow({
           {accountName}
         </span>
       )}
+
+      {action}
     </div>
   );
 }

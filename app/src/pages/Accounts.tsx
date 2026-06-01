@@ -1,7 +1,17 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getAccounts, createAccount, deleteAccount } from "@/lib/api";
+import {
+  getAccounts,
+  createAccount,
+  updateAccount,
+  topupAccount,
+  withdrawAccount,
+  deleteAccount,
+  getCardTypes,
+  getWalletTypes,
+} from "@/lib/api";
 import AccountCard from "@/components/shared/AccountCard";
+import { formatCurrency } from "@/lib/utils";
 import {
   Plus,
   Wallet,
@@ -19,6 +29,7 @@ import { motion } from "framer-motion";
 
 const accountTypes = [
   { id: "cash", label: "Наличные", icon: Banknote },
+  { id: "wallet", label: "Кошелёк", icon: Wallet },
   { id: "debit", label: "Дебетовая карта", icon: CreditCard },
   { id: "credit", label: "Кредитная карта", icon: CreditCard },
   { id: "savings", label: "Сбережения", icon: PiggyBank },
@@ -37,8 +48,26 @@ export default function Accounts() {
     queryFn: getAccounts,
   });
 
+  const { data: cardTypes = [] } = useQuery({
+    queryKey: ['card-types'],
+    queryFn: getCardTypes,
+  });
+
+  const { data: walletTypes = [] } = useQuery({
+    queryKey: ['wallet-types'],
+    queryFn: getWalletTypes,
+  });
+
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<number | null>(null);
+  const [operationAmount, setOperationAmount] = useState("");
+  const [accountDraft, setAccountDraft] = useState({
+    name: "",
+    type: "debit",
+    balance: "",
+    cardTypeId: "",
+    walletTypeId: "",
+  });
 
   const createMut = useMutation({
     mutationFn: createAccount,
@@ -57,16 +86,48 @@ export default function Accounts() {
     },
   });
 
+  const updateMut = useMutation({
+    mutationFn: ({ id, draft }: { id: number; draft: typeof accountDraft }) =>
+      updateAccount(id, {
+        name: draft.name,
+        type: draft.type,
+        balance: Number(draft.balance || 0),
+        cardTypeId: draft.cardTypeId ? Number(draft.cardTypeId) : undefined,
+        walletTypeId: draft.walletTypeId ? Number(draft.walletTypeId) : undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+    },
+  });
+
+  const topupMut = useMutation({
+    mutationFn: ({ id, amount }: { id: number; amount: number }) => topupAccount(id, amount),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      setOperationAmount("");
+    },
+  });
+
+  const withdrawMut = useMutation({
+    mutationFn: ({ id, amount }: { id: number; amount: number }) => withdrawAccount(id, amount),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      setOperationAmount("");
+    },
+  });
+
   const [newAccount, setNewAccount] = useState({
     name: "",
     type: "debit" as string,
     balance: "",
     color: "#0E7490",
     icon: "wallet",
+    cardTypeId: "",
+    walletTypeId: "",
   });
 
   const resetForm = () => {
-    setNewAccount({ name: "", type: "debit", balance: "", color: "#0E7490", icon: "wallet" });
+    setNewAccount({ name: "", type: "debit", balance: "", color: "#0E7490", icon: "wallet", cardTypeId: "", walletTypeId: "" });
   };
 
   const handleCreate = () => {
@@ -77,13 +138,15 @@ export default function Accounts() {
       balance: newAccount.balance ? Number(newAccount.balance) : 0,
       color: newAccount.color,
       icon: newAccount.icon,
+      cardTypeId: newAccount.cardTypeId ? Number(newAccount.cardTypeId) : undefined,
+      walletTypeId: newAccount.walletTypeId ? Number(newAccount.walletTypeId) : undefined,
     });
   };
 
   const selectedAcc = accounts.find((a) => a.id === selectedAccount);
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
         {accounts.map((account, i) => (
           <motion.div
@@ -98,7 +161,17 @@ export default function Accounts() {
               balance={account.balance}
               color={account.color}
               icon={account.icon}
-              onClick={() => setSelectedAccount(account.id)}
+              onClick={() => {
+                setAccountDraft({
+                  name: account.name,
+                  type: account.type,
+                  balance: String(account.balance),
+                  cardTypeId: "",
+                  walletTypeId: "",
+                });
+                setOperationAmount("");
+                setSelectedAccount(account.id);
+              }}
             />
           </motion.div>
         ))}
@@ -127,7 +200,7 @@ export default function Accounts() {
               <Input
                 value={newAccount.name}
                 onChange={(e) => setNewAccount({ ...newAccount, name: e.target.value })}
-                placeholder="Например: Сбербанк"
+                placeholder="Например: Alif"
                 className="h-11 rounded-xl"
               />
             </div>
@@ -138,7 +211,7 @@ export default function Accounts() {
                 {accountTypes.map((t) => (
                   <button
                     key={t.id}
-                    onClick={() => setNewAccount({ ...newAccount, type: t.id })}
+                    onClick={() => setNewAccount({ ...newAccount, type: t.id, cardTypeId: "", walletTypeId: "" })}
                     className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-colors ${
                       newAccount.type === t.id
                         ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/5 text-[var(--accent-primary)]"
@@ -152,17 +225,51 @@ export default function Accounts() {
               </div>
             </div>
 
+            {(newAccount.type === "debit" || newAccount.type === "credit") && (
+              <div>
+                <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Тип карты</Label>
+                <select
+                  value={newAccount.cardTypeId}
+                  onChange={(e) => setNewAccount({ ...newAccount, cardTypeId: e.target.value })}
+                  className="w-full h-11 px-3 rounded-xl border border-[var(--border-medium)] text-sm bg-white"
+                >
+                  <option value="">Не указан</option>
+                  {cardTypes.map((type) => (
+                    <option key={type.id} value={type.id}>{type.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {newAccount.type === "wallet" && (
+              <div>
+                <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Тип кошелька</Label>
+                <select
+                  value={newAccount.walletTypeId}
+                  onChange={(e) => setNewAccount({ ...newAccount, walletTypeId: e.target.value })}
+                  className="w-full h-11 px-3 rounded-xl border border-[var(--border-medium)] text-sm bg-white"
+                >
+                  <option value="">Не указан</option>
+                  {walletTypes.map((type) => (
+                    <option key={type.id} value={type.id}>{type.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div>
               <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Начальный баланс</Label>
               <div className="relative">
                 <Input
                   type="number"
+                  min={0}
                   value={newAccount.balance}
+                  onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
                   onChange={(e) => setNewAccount({ ...newAccount, balance: e.target.value })}
                   placeholder="0"
                   className="h-11 rounded-xl pr-12"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)]">₽</span>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)]">TJS</span>
               </div>
             </div>
 
@@ -205,7 +312,7 @@ export default function Accounts() {
       {/* Account Detail Side Panel */}
       {selectedAccount && selectedAcc && (
         <Dialog open={!!selectedAccount} onOpenChange={() => setSelectedAccount(null)}>
-          <DialogContent className="sm:max-w-[400px] rounded-2xl p-0 overflow-hidden">
+          <DialogContent showCloseButton={false} className="sm:max-w-[400px] rounded-2xl p-0 overflow-hidden">
             <DialogHeader className="p-6 pb-0">
               <div className="flex items-center justify-between">
                 <DialogTitle className="font-heading text-xl">{selectedAcc.name}</DialogTitle>
@@ -225,11 +332,109 @@ export default function Accounts() {
                 <Wallet className="w-7 h-7" style={{ color: selectedAcc.color }} />
               </div>
               <p className="font-mono text-2xl font-semibold text-[var(--text-primary)]">
-                {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(selectedAcc.balance)}
+                {formatCurrency(selectedAcc.balance)}
               </p>
-              <p className="text-sm text-[var(--text-muted)]">
-                {accountTypes.find((t) => t.id === selectedAcc.type)?.label || selectedAcc.type}
-              </p>
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Название</Label>
+                  <Input
+                    value={accountDraft.name}
+                    onChange={(e) => setAccountDraft({ ...accountDraft, name: e.target.value })}
+                    className="h-10 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Тип</Label>
+                  <select
+                    value={accountDraft.type}
+                    onChange={(e) => setAccountDraft({ ...accountDraft, type: e.target.value, cardTypeId: "", walletTypeId: "" })}
+                    className="w-full h-10 px-3 rounded-xl border border-[var(--border-medium)] text-sm bg-white"
+                  >
+                    {accountTypes.map((type) => (
+                      <option key={type.id} value={type.id}>{type.label}</option>
+                    ))}
+                  </select>
+                </div>
+                {(accountDraft.type === "debit" || accountDraft.type === "credit") && (
+                  <div>
+                    <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Тип карты</Label>
+                    <select
+                      value={accountDraft.cardTypeId}
+                      onChange={(e) => setAccountDraft({ ...accountDraft, cardTypeId: e.target.value })}
+                      className="w-full h-10 px-3 rounded-xl border border-[var(--border-medium)] text-sm bg-white"
+                    >
+                      <option value="">Не указан</option>
+                      {cardTypes.map((type) => (
+                        <option key={type.id} value={type.id}>{type.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {accountDraft.type === "wallet" && (
+                  <div>
+                    <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Тип кошелька</Label>
+                    <select
+                      value={accountDraft.walletTypeId}
+                      onChange={(e) => setAccountDraft({ ...accountDraft, walletTypeId: e.target.value })}
+                      className="w-full h-10 px-3 rounded-xl border border-[var(--border-medium)] text-sm bg-white"
+                    >
+                      <option value="">Не указан</option>
+                      {walletTypes.map((type) => (
+                        <option key={type.id} value={type.id}>{type.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Баланс</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={accountDraft.balance}
+                    onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
+                    onChange={(e) => setAccountDraft({ ...accountDraft, balance: e.target.value })}
+                    className="h-10 rounded-xl"
+                  />
+                </div>
+                <Button
+                  onClick={() => updateMut.mutate({ id: selectedAcc.id, draft: accountDraft })}
+                  disabled={!accountDraft.name || updateMut.isPending}
+                  className="w-full h-10 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white"
+                >
+                  {updateMut.isPending ? "Сохранение..." : "Сохранить счёт"}
+                </Button>
+              </div>
+
+              <div className="pt-4 border-t border-[var(--border-light)] space-y-3">
+                <Label className="text-xs text-[var(--text-muted)] block">Пополнение или списание</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={operationAmount}
+                  onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
+                  onChange={(e) => setOperationAmount(e.target.value)}
+                  placeholder="Сумма"
+                  className="h-10 rounded-xl"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    onClick={() => topupMut.mutate({ id: selectedAcc.id, amount: Number(operationAmount) })}
+                    disabled={!operationAmount || topupMut.isPending}
+                    className="h-10 rounded-xl bg-[var(--accent-secondary)] hover:bg-[var(--accent-secondary)] text-white"
+                  >
+                    Пополнить
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => withdrawMut.mutate({ id: selectedAcc.id, amount: Number(operationAmount) })}
+                    disabled={!operationAmount || withdrawMut.isPending}
+                    className="h-10 rounded-xl border-[var(--border-medium)]"
+                  >
+                    Списать
+                  </Button>
+                </div>
+              </div>
+
               <div className="flex gap-2 pt-2">
                 <Button
                   variant="destructive"

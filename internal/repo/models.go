@@ -698,18 +698,23 @@ func (db *dbSavingGoal) ToEntity() *domain.SavingGoal {
 }
 
 type dbGoalContribution struct {
-	ID            int    `db:"id"`
-	GoalID        int    `db:"goal_id"`
-	TransactionID int    `db:"transaction_id"`
-	Amount        float64 `db:"amount"`
-	CreatedAt     string `db:"created_at"`
+	ID            int           `db:"id"`
+	GoalID        int           `db:"goal_id"`
+	TransactionID sql.NullInt64 `db:"transaction_id"`
+	Amount        float64       `db:"amount"`
+	CreatedAt     string        `db:"created_at"`
 }
 
 func (db *dbGoalContribution) ToEntity() *domain.GoalContribution {
+	var txID *int
+	if db.TransactionID.Valid {
+		i := int(db.TransactionID.Int64)
+		txID = &i
+	}
 	return &domain.GoalContribution{
 		ID:            db.ID,
 		GoalID:        db.GoalID,
-		TransactionID: db.TransactionID,
+		TransactionID: txID,
 		Amount:        db.Amount,
 		CreatedAt:     parseTime(db.CreatedAt),
 	}

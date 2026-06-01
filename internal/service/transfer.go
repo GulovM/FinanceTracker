@@ -76,8 +76,7 @@ func (s *Service) CreateTransfer(ctx context.Context, createTransfer *domain.Cre
 		Amount:     createTransfer.Amount,
 		TransferID: id,
 	}
-	err = s.transactions.CreateTransactionTx(ctx, tx, &createTransactionW)
-	if err != nil {
+	if _, err = s.transactions.CreateTransactionTx(ctx, tx, &createTransactionW); err != nil {
 		return fmt.Errorf("s.transactions.CreateTransaction error: %w", err)
 	}
 
@@ -89,8 +88,7 @@ func (s *Service) CreateTransfer(ctx context.Context, createTransfer *domain.Cre
 		Amount:     createTransfer.Amount,
 		TransferID: id,
 	}
-	err = s.transactions.CreateTransactionTx(ctx, tx, &createTransactionT)
-	if err != nil {
+	if _, err = s.transactions.CreateTransactionTx(ctx, tx, &createTransactionT); err != nil {
 		return fmt.Errorf("s.transactions.CreateTransaction error: %w", err)
 	}
 

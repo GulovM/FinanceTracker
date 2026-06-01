@@ -30,25 +30,33 @@ export default function Analytics() {
   ];
 
   const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const localDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
   let fromDate: string;
-  const toDate = now.toISOString().split("T")[0];
+  const toDate = localDate(tomorrow);
 
   switch (period) {
-    case "week":
-      fromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    case "week": {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 7);
+      fromDate = localDate(d);
       break;
+    }
     case "month":
-      fromDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+      fromDate = localDate(new Date(now.getFullYear(), now.getMonth(), 1));
       break;
     case "quarter":
-      fromDate = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1).toISOString().split("T")[0];
+      fromDate = localDate(new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1));
       break;
     case "year":
       fromDate = `${now.getFullYear()}-01-01`;
       break;
   }
 
-  const twelveMonthsAgo = new Date(now.getFullYear() - 1, now.getMonth(), 1).toISOString().split("T")[0];
+  const twelveMonthsAgo = localDate(new Date(now.getFullYear() - 1, now.getMonth(), 1));
 
   const { data: periodTxData } = useQuery({
     queryKey: ['transactions', 'analytics', fromDate, toDate],
@@ -135,15 +143,15 @@ export default function Analytics() {
     : 0;
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
       {/* Period Selector */}
       <div className="flex justify-center">
-        <div className="inline-flex rounded-xl border border-[var(--border-medium)] overflow-hidden bg-white">
+        <div className="flex w-full sm:w-auto rounded-xl border border-[var(--border-medium)] overflow-hidden bg-white">
           {periods.map((p) => (
             <button
               key={p.id}
               onClick={() => setPeriod(p.id)}
-              className={`px-6 py-2.5 text-sm font-medium transition-colors ${
+              className={`flex-1 sm:flex-none px-4 sm:px-6 py-2.5 text-sm font-medium transition-colors whitespace-nowrap ${
                 period === p.id
                   ? "bg-[var(--accent-primary)] text-white"
                   : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
@@ -215,16 +223,16 @@ export default function Analytics() {
           <h3 className="font-heading text-lg font-medium text-[var(--text-primary)] mb-4">
             Структура расходов
           </h3>
-          <div className="flex items-center gap-6">
-            <div className="w-[200px] h-[200px]">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+            <div className="w-full sm:w-[200px] h-[180px] sm:h-[200px] flex-shrink-0">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={pieData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={50}
-                    outerRadius={90}
+                    innerRadius={45}
+                    outerRadius={80}
                     paddingAngle={2}
                     dataKey="value"
                   >
@@ -246,15 +254,15 @@ export default function Analytics() {
             </div>
             <div className="flex-1 space-y-2">
               {pieData.map((item, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div key={i} className="flex items-center justify-between min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
                     <div
                       className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                       style={{ backgroundColor: item.color }}
                     />
-                    <span className="text-sm text-[var(--text-secondary)]">{item.name}</span>
+                    <span className="text-sm text-[var(--text-secondary)] truncate">{item.name}</span>
                   </div>
-                  <span className="text-sm font-mono text-[var(--text-muted)]">
+                  <span className="text-sm font-mono text-[var(--text-muted)] flex-shrink-0 ml-2">
                     {formatCurrency(item.value)}
                   </span>
                 </div>

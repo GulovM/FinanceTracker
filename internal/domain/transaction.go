@@ -87,8 +87,8 @@ const (
 type TransactionRepository interface {
 	GetTransactions(ctx context.Context, filter *TransactionsFilter) ([]*Transactions, error)
 	GetTransactionByID(ctx context.Context, userID, id int) (*Transactions, error)
-	CreateTransaction(ctx context.Context, createTransaction *CreateTransaction) error
-	CreateTransactionTx(ctx context.Context, tx pgx.Tx, createTransaction *CreateTransaction) error
+	CreateTransaction(ctx context.Context, createTransaction *CreateTransaction) (int, error)
+	CreateTransactionTx(ctx context.Context, tx pgx.Tx, createTransaction *CreateTransaction) (int, error)
 	UpdateTransaction(ctx context.Context, updateTransaction *UpdateTransaction) error
 	DeleteTransaction(ctx context.Context, id, userID int) error
 }

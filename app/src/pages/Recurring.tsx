@@ -4,7 +4,11 @@ import {
   getRecurringList,
   getAccounts,
   getCategories,
+  getSubcategories,
+  getMerchants,
+  getTags,
   createRecurring,
+  updateRecurring,
   toggleRecurring,
   deleteRecurring,
 } from "@/lib/api";
@@ -15,6 +19,7 @@ import {
   Pause,
   Play,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -57,6 +62,40 @@ export default function Recurring() {
 
   const [isAddOpen, setIsAddOpen] = useState(false);
 
+  const [newItem, setNewItem] = useState({
+    name: "",
+    type: "expense" as "income" | "expense",
+    amount: "",
+    accountId: "",
+    categoryId: "",
+    subcategoryId: "",
+    merchantId: "",
+    tagIds: [] as number[],
+    frequency: "monthly" as string,
+    startDate: new Date().toISOString().split("T")[0],
+    endDate: "",
+    dayOfMonth: "",
+    description: "",
+  });
+
+  const selectedCategoryId = Number(newItem.categoryId || 0);
+
+  const { data: subcategories = [] } = useQuery({
+    queryKey: ['subcategories', selectedCategoryId],
+    queryFn: () => getSubcategories(selectedCategoryId),
+    enabled: selectedCategoryId > 0,
+  });
+
+  const { data: merchants = [] } = useQuery({
+    queryKey: ['merchants'],
+    queryFn: getMerchants,
+  });
+
+  const { data: tags = [] } = useQuery({
+    queryKey: ['tags'],
+    queryFn: getTags,
+  });
+
   const createMut = useMutation({
     mutationFn: createRecurring,
     onSuccess: () => {
@@ -72,40 +111,60 @@ export default function Recurring() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['recurring'] }),
   });
 
+  const updateMut = useMutation({
+    mutationFn: ({ id, item, name, amount }: {
+      id: number
+      item: (typeof items)[number]
+      name: string
+      amount: number
+    }) => updateRecurring(id, {
+      name,
+      type: item.type,
+      amount,
+      accountId: item.accountId,
+      categoryId: item.categoryId,
+      frequency: item.frequency,
+      startDate: item.startDate || new Date().toISOString().split("T")[0],
+      endDate: item.endDate,
+      dayOfMonth: item.dayOfMonth,
+      subcategoryId: item.subcategoryId,
+      merchantId: item.merchantId,
+      tagIds: item.tagIds,
+    }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['recurring'] }),
+  });
+
   const deleteMut = useMutation({
     mutationFn: deleteRecurring,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['recurring'] }),
   });
 
-  const [newItem, setNewItem] = useState({
-    name: "",
-    type: "expense" as "income" | "expense",
-    amount: "",
-    accountId: "",
-    categoryId: "",
-    frequency: "monthly" as string,
-    startDate: new Date().toISOString().split("T")[0],
-    endDate: "",
-    dayOfMonth: "",
-    description: "",
-  });
-
   const resetForm = () => {
     setNewItem({
       name: "", type: "expense", amount: "", accountId: "", categoryId: "",
+      subcategoryId: "", merchantId: "", tagIds: [],
       frequency: "monthly", startDate: new Date().toISOString().split("T")[0],
       endDate: "", dayOfMonth: "", description: "",
     });
   };
 
+  const canCreate =
+    !!newItem.name &&
+    !!newItem.amount &&
+    !!newItem.accountId &&
+    !!newItem.categoryId;
+
   const handleCreate = () => {
-    if (!newItem.name || !newItem.amount || !newItem.accountId) return;
+    if (!canCreate) return;
     createMut.mutate({
       name: newItem.name,
       type: newItem.type,
       amount: Number(newItem.amount),
       accountId: Number(newItem.accountId),
       categoryId: newItem.categoryId ? Number(newItem.categoryId) : undefined,
+      subcategoryId: newItem.subcategoryId ? Number(newItem.subcategoryId) : undefined,
+      merchantId: newItem.merchantId ? Number(newItem.merchantId) : undefined,
+      tagIds: newItem.tagIds,
       frequency: newItem.frequency,
       startDate: newItem.startDate,
       endDate: newItem.endDate || undefined,
@@ -115,7 +174,7 @@ export default function Recurring() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="space-y-3">
         {items.map((item, i) => (
           <motion.div
@@ -138,6 +197,8 @@ export default function Recurring() {
                 {item.dayOfMonth ? `, ${item.dayOfMonth}-го числа` : ""}
                 {" · "}
                 {accounts.find((a) => a.id === item.accountId)?.name || "Счёт"}
+                {item.merchantName ? ` · ${item.merchantName}` : ""}
+                {item.subcategoryName ? ` · ${item.subcategoryName}` : ""}
               </p>
             </div>
 
@@ -152,6 +213,19 @@ export default function Recurring() {
             </span>
 
             <div className="flex items-center gap-1">
+              <button
+                onClick={() => {
+                  const name = prompt("Название автоплатежа", item.name);
+                  if (!name) return;
+                  const amount = prompt("Сумма", String(item.amount));
+                  if (!amount) return;
+                  updateMut.mutate({ id: item.id, item, name, amount: Number(amount) });
+                }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                title="Изменить"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
               <button
                 onClick={() => toggleMut.mutate({ id: item.id, isActive: item.isActive })}
                 className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
@@ -231,12 +305,14 @@ export default function Recurring() {
               <div className="relative">
                 <Input
                   type="number"
+                  min={0}
                   value={newItem.amount}
+                  onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
                   onChange={(e) => setNewItem({ ...newItem, amount: e.target.value })}
                   placeholder="0"
                   className="h-11 rounded-xl pr-12"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)]">₽</span>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)]">TJS</span>
               </div>
             </div>
 
@@ -256,7 +332,7 @@ export default function Recurring() {
 
             <div>
               <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Категория</Label>
-              <Select value={newItem.categoryId} onValueChange={(v) => setNewItem({ ...newItem, categoryId: v })}>
+              <Select value={newItem.categoryId} onValueChange={(v) => setNewItem({ ...newItem, categoryId: v, subcategoryId: "", merchantId: "" })}>
                 <SelectTrigger className="h-11 rounded-xl">
                   <SelectValue placeholder="Выберите категорию" />
                 </SelectTrigger>
@@ -269,6 +345,80 @@ export default function Recurring() {
                 </SelectContent>
               </Select>
             </div>
+
+            {newItem.categoryId && (
+              <div>
+                <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Подкатегория</Label>
+                <Select
+                  value={newItem.subcategoryId || "none"}
+                  onValueChange={(v) => setNewItem({ ...newItem, subcategoryId: v === "none" ? "" : v })}
+                >
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue placeholder="Без подкатегории" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Без подкатегории</SelectItem>
+                    {subcategories.map((subcat) => (
+                      <SelectItem key={subcat.id} value={String(subcat.id)}>{subcat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {newItem.categoryId && (
+              <div>
+                <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Мерчант</Label>
+                <Select
+                  value={newItem.merchantId || "none"}
+                  onValueChange={(v) => setNewItem({ ...newItem, merchantId: v === "none" ? "" : v })}
+                >
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue placeholder="Без мерчанта" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Без мерчанта</SelectItem>
+                    {merchants
+                      .filter((merchant) => merchant.categoryId === Number(newItem.categoryId))
+                      .map((merchant) => (
+                        <SelectItem key={merchant.id} value={String(merchant.id)}>
+                          {merchant.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {tags.length > 0 && (
+              <div>
+                <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Теги</Label>
+                <div className="flex flex-wrap gap-2">
+                  {tags.map((tag) => {
+                    const active = newItem.tagIds.includes(tag.id);
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => setNewItem({
+                          ...newItem,
+                          tagIds: active
+                            ? newItem.tagIds.filter((id) => id !== tag.id)
+                            : [...newItem.tagIds, tag.id],
+                        })}
+                        className={`px-3 py-1.5 rounded-lg border text-xs transition-colors ${
+                          active
+                            ? "border-[var(--accent-primary)] bg-[var(--accent-primary)] text-white"
+                            : "border-[var(--border-medium)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                        }`}
+                      >
+                        {tag.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div>
               <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Частота</Label>
@@ -329,7 +479,7 @@ export default function Recurring() {
               </Button>
               <Button
                 onClick={handleCreate}
-                disabled={!newItem.name || !newItem.amount || !newItem.accountId || createMut.isPending}
+                disabled={!canCreate || createMut.isPending}
                 className="flex-1 h-11 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white"
               >
                 {createMut.isPending ? "Создание..." : "Создать"}

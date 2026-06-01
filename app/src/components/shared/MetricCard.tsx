@@ -11,7 +11,7 @@ interface MetricCardProps {
   prefix?: string;
 }
 
-export default function MetricCard({ label, value, icon: Icon, color, trend, prefix = "₽" }: MetricCardProps) {
+export default function MetricCard({ label, value, icon: Icon, color, trend, prefix = "TJS" }: MetricCardProps) {
   const displayColor = color || "var(--text-primary)";
   const isPositive = trend !== undefined && trend >= 0;
 
@@ -19,24 +19,24 @@ export default function MetricCard({ label, value, icon: Icon, color, trend, pre
     <motion.div
       whileHover={{ y: -2 }}
       transition={{ duration: 0.2 }}
-      className="bg-white rounded-2xl border border-[var(--border-light)] p-6 shadow-[0_1px_3px_rgba(28,25,23,0.04)] hover:shadow-[0_4px_12px_rgba(28,25,23,0.06)] transition-shadow"
+      className="bg-white rounded-2xl border border-[var(--border-light)] p-4 sm:p-6 shadow-[0_1px_3px_rgba(28,25,23,0.04)] hover:shadow-[0_4px_12px_rgba(28,25,23,0.06)] transition-shadow"
     >
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
+      <div className="flex items-center justify-between mb-2 sm:mb-3">
+        <span className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-[var(--text-muted)]">
           {label}
         </span>
         <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center"
+          className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center"
           style={{ backgroundColor: `${displayColor}12` }}
         >
-          <Icon className="w-[18px] h-[18px]" style={{ color: displayColor }} />
+          <Icon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" style={{ color: displayColor }} />
         </div>
       </div>
       <div className="flex items-baseline gap-1">
-        <span className="text-lg font-medium" style={{ color: displayColor }}>
+        <span className="text-sm sm:text-lg font-medium" style={{ color: displayColor }}>
           {prefix}
         </span>
-        <span className="text-2xl font-semibold font-mono tracking-tight" style={{ color: displayColor }}>
+        <span className="text-lg sm:text-2xl font-semibold font-mono tracking-tight" style={{ color: displayColor }}>
           {new Intl.NumberFormat('ru-RU').format(Math.abs(value))}
         </span>
       </div>

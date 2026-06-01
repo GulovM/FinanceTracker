@@ -8,7 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
     style: 'currency',
-    currency: 'RUB',
+    currency: 'TJS',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);
@@ -16,12 +16,12 @@ export function formatCurrency(amount: number): string {
 
 export function formatCurrencyShort(amount: number): string {
   if (amount >= 1000000) {
-    return `₽ ${(amount / 1000000).toFixed(1)}M`;
+    return `TJS ${(amount / 1000000).toFixed(1)}M`;
   }
   if (amount >= 1000) {
-    return `₽ ${(amount / 1000).toFixed(0)}K`;
+    return `TJS ${(amount / 1000).toFixed(0)}K`;
   }
-  return `₽ ${amount}`;
+  return `TJS ${amount}`;
 }
 
 export function formatDate(dateStr: string | Date): string {

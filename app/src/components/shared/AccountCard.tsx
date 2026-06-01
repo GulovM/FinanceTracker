@@ -15,6 +15,7 @@ interface AccountCardProps {
 
 const typeLabels: Record<string, string> = {
   cash: "Наличные",
+  wallet: "Кошелёк",
   debit: "Дебетовая карта",
   credit: "Кредитная карта",
   savings: "Сбережения",

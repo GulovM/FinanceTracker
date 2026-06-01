@@ -1,8 +1,8 @@
-﻿package service
+package service
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"errors"
 	"fmt"
@@ -38,18 +38,18 @@ func (s *Service) GetTransactions(ctx context.Context, userID int, filter *domai
 	return transactions, nil
 }
 
-func (s *Service) CreateTransaction(ctx context.Context, createTransaction *domain.CreateTransaction) error {
+func (s *Service) CreateTransaction(ctx context.Context, createTransaction *domain.CreateTransaction) (int, error) {
 	if createTransaction == nil {
-		return fmt.Errorf("transaction payload is required")
+		return 0, fmt.Errorf("transaction payload is required")
 	}
 
 	if createTransaction.Amount <= 0 {
-		return fmt.Errorf("amount must be greater than zero")
+		return 0, fmt.Errorf("amount must be greater than zero")
 	}
 
 	tx, err := s.tx.BeginTx(ctx)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer func() {
 		if err != nil {
@@ -62,45 +62,46 @@ func (s *Service) CreateTransaction(ctx context.Context, createTransaction *doma
 	acc, err := s.accounts.GetAccountByIDTx(ctx, tx, createTransaction.UserID, createTransaction.AccountID)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("account with this ID not found: %w", err)
+			return 0, fmt.Errorf("account with this ID not found: %w", err)
 		}
-		return fmt.Errorf("s.accounts.GetAccountByIDTx error: %w", err)
+		return 0, fmt.Errorf("s.accounts.GetAccountByIDTx error: %w", err)
 	}
 
 	var ctg *domain.Category
 	if ctg, err = s.categories.GetCategoryByIDTx(ctx, tx, createTransaction.CategoryID, createTransaction.UserID); err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("category with this ID not found: %w", err)
+			return 0, fmt.Errorf("category with this ID not found: %w", err)
 		}
-		return fmt.Errorf("s.categories.GetCategoryByIDTx error: %w", err)
+		return 0, fmt.Errorf("s.categories.GetCategoryByIDTx error: %w", err)
 	}
 
 	if createTransaction.SubcategoryID != nil {
 		if _, err = s.categories.GetSubcategoryByIDTx(ctx, tx, *createTransaction.SubcategoryID, createTransaction.UserID); err != nil {
 			if errors.Is(err, errs.ErrNotFound) {
-				return fmt.Errorf("subcategory with this ID not found: %w", err)
+				return 0, fmt.Errorf("subcategory with this ID not found: %w", err)
 			}
-			return fmt.Errorf("s.categories.GetSubcategoryByIDTx error: %w", err)
+			return 0, fmt.Errorf("s.categories.GetSubcategoryByIDTx error: %w", err)
 		}
 	}
 
 	if createTransaction.MerchantID != nil {
 		if _, err = s.merchants.GetMerchantByIDTx(ctx, tx, *createTransaction.MerchantID, createTransaction.UserID); err != nil {
 			if errors.Is(err, errs.ErrNotFound) {
-				return fmt.Errorf("merchant with this ID not found: %w", err)
+				return 0, fmt.Errorf("merchant with this ID not found: %w", err)
 			}
-			return fmt.Errorf("s.merchants.GetMerchantByIDTx error: %w", err)
+			return 0, fmt.Errorf("s.merchants.GetMerchantByIDTx error: %w", err)
 		}
 	}
 
 	createTransaction.Type = ctg.Type
 
 	if createTransaction.Type == domain.TransactionTypeExpense && acc.Balance < createTransaction.Amount {
-		return fmt.Errorf("insufficient balance")
+		return 0, fmt.Errorf("insufficient balance")
 	}
 
-	if err = s.transactions.CreateTransactionTx(ctx, tx, createTransaction); err != nil {
-		return fmt.Errorf("s.transactions.CreateTransaction error: %w", err)
+	var txID int
+	if txID, err = s.transactions.CreateTransactionTx(ctx, tx, createTransaction); err != nil {
+		return 0, fmt.Errorf("s.transactions.CreateTransaction error: %w", err)
 	}
 
 	updateAccount := domain.ChangeBalanceAccount{
@@ -121,10 +122,10 @@ func (s *Service) CreateTransaction(ctx context.Context, createTransaction *doma
 	}
 
 	if err != nil {
-		return fmt.Errorf("update balance error: %w", err)
+		return 0, fmt.Errorf("update balance error: %w", err)
 	}
 
-	return nil
+	return txID, nil
 }
 
 func (s *Service) CreateTransactionTx(ctx context.Context, tx pgx.Tx, createTransaction *domain.CreateTransaction) error {
@@ -176,7 +177,7 @@ func (s *Service) CreateTransactionTx(ctx context.Context, tx pgx.Tx, createTran
 		return fmt.Errorf("insufficient balance")
 	}
 
-	if err = s.transactions.CreateTransactionTx(ctx, tx, createTransaction); err != nil {
+	if _, err = s.transactions.CreateTransactionTx(ctx, tx, createTransaction); err != nil {
 		return fmt.Errorf("s.transactions.CreateTransaction error: %w", err)
 	}
 
@@ -205,6 +206,14 @@ func (s *Service) CreateTransactionTx(ctx context.Context, tx pgx.Tx, createTran
 }
 
 func (s *Service) UpdateTransaction(ctx context.Context, updateTransaction *domain.UpdateTransaction) error {
+	if updateTransaction == nil {
+		return fmt.Errorf("transaction payload is required")
+	}
+
+	if updateTransaction.Amount <= 0 {
+		return fmt.Errorf("amount must be greater than zero")
+	}
+
 	tx, err := s.tx.BeginTx(ctx)
 	if err != nil {
 		return err
@@ -241,11 +250,26 @@ func (s *Service) UpdateTransaction(ctx context.Context, updateTransaction *doma
 		return fmt.Errorf("s.categories.GetCategoryByIDTx error: %w", err)
 	}
 
-	if _, err = s.categories.GetSubcategoryByIDTx(ctx, tx, *updateTransaction.SubcategoryID, updateTransaction.UserID); err != nil {
-		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("subcategory with this ID not found: %w", err)
+	if ctg.Type == domain.TransactionTypeTransfer || trn.Type == domain.TransactionTypeTransfer || trn.TransferID != nil {
+		return fmt.Errorf("can not update transfer")
+	}
+
+	if updateTransaction.SubcategoryID != nil {
+		if _, err = s.categories.GetSubcategoryByIDTx(ctx, tx, *updateTransaction.SubcategoryID, updateTransaction.UserID); err != nil {
+			if errors.Is(err, errs.ErrNotFound) {
+				return fmt.Errorf("subcategory with this ID not found: %w", err)
+			}
+			return fmt.Errorf("s.categories.GetSubcategoryByIDTx error: %w", err)
 		}
-		return fmt.Errorf("s.categories.GetSubcategoryByIDTx error: %w", err)
+	}
+
+	if updateTransaction.MerchantID != nil {
+		if _, err = s.merchants.GetMerchantByIDTx(ctx, tx, *updateTransaction.MerchantID, updateTransaction.UserID); err != nil {
+			if errors.Is(err, errs.ErrNotFound) {
+				return fmt.Errorf("merchant with this ID not found: %w", err)
+			}
+			return fmt.Errorf("s.merchants.GetMerchantByIDTx error: %w", err)
+		}
 	}
 
 	updateTransaction.Type = ctg.Type
@@ -276,13 +300,24 @@ func (s *Service) UpdateTransaction(ctx context.Context, updateTransaction *doma
 		return fmt.Errorf("update balance error: %w", err)
 	}
 
+	acc, err := s.accounts.GetAccountByIDTx(ctx, tx, updateTransaction.UserID, updateTransaction.AccountID)
+	if err != nil {
+		if errors.Is(err, errs.ErrNotFound) {
+			return fmt.Errorf("account with this ID not found: %w", err)
+		}
+		return fmt.Errorf("s.accounts.GetAccountByIDTx error: %w", err)
+	}
+	if updateTransaction.Type == domain.TransactionTypeExpense && acc.Balance < updateTransaction.Amount {
+		return fmt.Errorf("insufficient balance")
+	}
+
 	err = s.transactions.UpdateTransaction(ctx, updateTransaction)
 	if err != nil {
 		return fmt.Errorf("s.transactions.UpdateTransaction error: %w", err)
 	}
 
 	updateAccount = domain.ChangeBalanceAccount{
-		ID:      updateTransaction.ID,
+		ID:      updateTransaction.AccountID,
 		UserID:  updateTransaction.UserID,
 		Balance: updateTransaction.Amount,
 	}

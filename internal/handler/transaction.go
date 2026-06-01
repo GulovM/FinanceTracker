@@ -13,7 +13,7 @@ import (
 
 type transactionService interface {
 	GetTransactions(ctx context.Context, userID int, filter *domain.TransactionsFilter) ([]*domain.Transactions, error)
-	CreateTransaction(ctx context.Context, createTransaction *domain.CreateTransaction) error
+	CreateTransaction(ctx context.Context, createTransaction *domain.CreateTransaction) (int, error)
 	UpdateTransaction(ctx context.Context, updateTransaction *domain.UpdateTransaction) error
 	DeleteTransaction(ctx context.Context, id, userID int) error
 }
@@ -145,14 +145,14 @@ func (h *Handler) CreateTransaction(c *gin.Context) {
 		TagIDs:        in.TagIDs,
 	}
 
-	err = h.transactions.CreateTransaction(c.Request.Context(), &transactionCreate)
+	txID, err := h.transactions.CreateTransaction(c.Request.Context(), &transactionCreate)
 	if err != nil {
 		fmt.Println("h.transactions.CreateTransaction error:", err)
 		writeError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "succes"})
+	c.JSON(http.StatusCreated, gin.H{"id": txID})
 }
 
 func (h *Handler) UpdateTransaction(c *gin.Context) {
