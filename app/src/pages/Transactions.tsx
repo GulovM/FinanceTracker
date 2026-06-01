@@ -73,6 +73,13 @@ export default function Transactions() {
     recipient: "",
   });
 
+  const invalidateTransactionDependents = () => {
+    queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    queryClient.invalidateQueries({ queryKey: ['accounts'] });
+    queryClient.invalidateQueries({ queryKey: ['budgets'] });
+    queryClient.invalidateQueries({ queryKey: ['budget-summary'] });
+  };
+
   const { data, isLoading } = useQuery({
     queryKey: ['transactions', typeFilter, page],
     queryFn: () => getTransactions({
@@ -130,8 +137,7 @@ export default function Transactions() {
   const createMut = useMutation({
     mutationFn: createTransaction,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      invalidateTransactionDependents();
       setIsAddOpen(false);
       resetForm();
     },
@@ -140,8 +146,7 @@ export default function Transactions() {
   const deleteMut = useMutation({
     mutationFn: deleteTransaction,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      invalidateTransactionDependents();
     },
   });
 
@@ -160,8 +165,7 @@ export default function Transactions() {
       }
     }) => updateTransaction(id, input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      invalidateTransactionDependents();
       setIsEditOpen(false);
     },
   });

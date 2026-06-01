@@ -114,6 +114,8 @@ export default function Goals() {
       queryClient.invalidateQueries({ queryKey: ['goals'] });
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['budget-summary'] });
       setIsContributeOpen(false);
       setContributeAmount("");
       setContributeAccountId("");
@@ -121,12 +123,13 @@ export default function Goals() {
   });
 
   const updateMut = useMutation({
-    mutationFn: ({ id, name, targetAmount, targetDate }: {
+    mutationFn: ({ id, name, targetAmount, targetDate, priority }: {
       id: number
       name: string
       targetAmount: number
       targetDate?: string
-    }) => updateGoal(id, { name, targetAmount, targetDate }),
+      priority?: number
+    }) => updateGoal(id, { name, targetAmount, targetDate, priority }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goals'] });
     },
