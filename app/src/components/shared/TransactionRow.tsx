@@ -6,11 +6,15 @@ import type { ReactNode } from "react";
 interface TransactionRowProps {
   type: string;
   amount: number | string;
-  description: string | null;
+  description?: string | null;
   date: string | Date;
   categoryName?: string | null;
   categoryColor?: string | null;
   categoryIcon?: string | null;
+  subcategoryName?: string | null;
+  merchantName?: string | null;
+  recipient?: string | null;
+  tags?: string[];
   accountName?: string | null;
   accountColor?: string | null;
   onClick?: () => void;
@@ -27,6 +31,10 @@ export default function TransactionRow({
   categoryName,
   categoryColor,
   categoryIcon,
+  subcategoryName,
+  merchantName,
+  recipient,
+  tags = [],
   accountName,
   accountColor,
   onClick,
@@ -45,6 +53,11 @@ export default function TransactionRow({
       : "var(--text-secondary)";
 
   const prefix = type === "income" ? "+" : type === "expense" ? "−" : "";
+  const details = [
+    merchantName ? `Мерчант: ${merchantName}` : null,
+    subcategoryName ? `Подкатегория: ${subcategoryName}` : null,
+    recipient ? `Получатель: ${recipient}` : null,
+  ].filter((item): item is string => Boolean(item));
 
   return (
     <div
@@ -69,6 +82,26 @@ export default function TransactionRow({
           <span className="text-[var(--border-light)]">·</span>
           <span className="text-xs text-[var(--text-muted)]">{formatDateShort(date)}</span>
         </div>
+        {(details.length > 0 || tags.length > 0) && (
+          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+            {details.map((detail) => (
+              <span key={detail} className="text-[11px] text-[var(--text-muted)] truncate max-w-[180px]">
+                {detail}
+              </span>
+            ))}
+            {tags.slice(0, 3).map((tag) => (
+              <span
+                key={tag}
+                className="px-1.5 py-0.5 rounded-md bg-[var(--bg-hover)] text-[10px] font-medium text-[var(--text-secondary)]"
+              >
+                #{tag}
+              </span>
+            ))}
+            {tags.length > 3 && (
+              <span className="text-[11px] text-[var(--text-muted)]">+{tags.length - 3}</span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Amount */}

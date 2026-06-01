@@ -29,3 +29,4 @@
 {"level":"error","error":"insufficient balance","time":"2026-05-31T21:13:09+05:00","message":"internal error"}
 {"level":"error","error":"amount must be greater than zero","time":"2026-05-31T22:44:32+05:00","message":"internal error"}
 {"level":"error","error":"amount must be greater than zero","time":"2026-05-31T22:44:36+05:00","message":"internal error"}
+{"level":"info","time":"2026-06-01T15:41:15+05:00","message":"Запуск http сервера на порту :8080"}

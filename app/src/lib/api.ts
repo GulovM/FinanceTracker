@@ -116,6 +116,11 @@ function fromGoDate(value: unknown): string {
   return raw.split('T')[0].split(' ')[0]
 }
 
+function fromGoDateTime(value: unknown): string {
+  if (!value) return ''
+  return String(value).replace(' ', 'T')
+}
+
 function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined
 }
@@ -187,11 +192,14 @@ export type Account = {
 
 export type Transaction = {
   id: number
+  userName?: string
   type: 'income' | 'expense' | 'transfer'
   amount: number
   description: string | null
   recipient?: string
   date: string
+  createdAt?: string
+  updatedAt?: string
   accountId: number
   accountName?: string
   accountColor?: string
@@ -204,6 +212,9 @@ export type Transaction = {
   merchantId?: number
   merchantName?: string
   tags: string[]
+  recurringId?: number
+  transferId?: number
+  isDeleted?: boolean
 }
 
 export type Category = {
@@ -292,16 +303,24 @@ export type RecurringTransaction = {
   type: 'income' | 'expense'
   amount: number
   accountId: number
+  accountName?: string
   categoryId: number
+  categoryName?: string
   subcategoryId?: number
   merchantId?: number
   tagIds: number[]
+  recipient?: string
   startDate: string
   endDate?: string
+  nextRunAt: string
+  daysUntilNextRun?: number
   frequency: string
+  interval: number
   dayOfMonth?: number
+  dayOfWeek?: number
+  timezone: string
+  status: string
   isActive: boolean
-  categoryName?: string
   subcategoryName?: string
   merchantName?: string
   tags: string[]
@@ -456,6 +475,7 @@ export async function deleteAccount(id: number): Promise<void> {
 
 function mapTransaction(t: ApiRecord): Transaction {
   const rawDate = t.created_at
+  const createdAt = rawDate ? fromGoDateTime(rawDate) : undefined
   const date = rawDate ? fromGoDate(rawDate) : new Date().toISOString().split('T')[0]
   const rawType = String(t.type ?? 'Расход')
   const categoryId = Number(t.category_id ?? 0)
@@ -463,11 +483,14 @@ function mapTransaction(t: ApiRecord): Transaction {
   const merchantId = t.merchant_id == null ? undefined : Number(t.merchant_id)
   return {
     id: Number(t.id),
+    userName: optionalString(t.user_name),
     type: TYPE_FROM_RU[rawType] ?? 'expense',
     amount: Number(t.amount ?? 0),
     description: optionalString(t.comment) ?? null,
     recipient: optionalString(t.recipient),
     date,
+    createdAt,
+    updatedAt: t.updated_at ? fromGoDateTime(t.updated_at) : undefined,
     accountId: Number(t.account_id),
     accountName: optionalString(t.account_name),
     accountColor: getAccountColor('debit'),
@@ -480,6 +503,9 @@ function mapTransaction(t: ApiRecord): Transaction {
     merchantId,
     merchantName: optionalString(t.merchant_name),
     tags: Array.isArray(t.tags) ? t.tags.map(String) : [],
+    recurringId: t.recurring_id == null ? undefined : Number(t.recurring_id),
+    transferId: t.transfer_id == null ? undefined : Number(t.transfer_id),
+    isDeleted: Boolean(t.is_deleted ?? false),
   }
 }
 
@@ -967,6 +993,12 @@ function mapRecurring(r: ApiRecord): RecurringTransaction {
   const freq = FREQ_FROM_RU[ruFreq] ?? 'monthly'
 
   const dom = r.day_of_month != null ? Number(r.day_of_month) : undefined
+  const dow = r.day_of_week != null ? Number(r.day_of_week) : undefined
+  const nextRunAt = fromGoDateTime(r.next_run_at)
+  const nextRunDate = nextRunAt ? new Date(nextRunAt.replace(' ', 'T')) : null
+  const daysUntilNextRun = nextRunDate && Number.isFinite(nextRunDate.getTime())
+    ? Math.max(0, Math.ceil((nextRunDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : undefined
 
   return {
     id: Number(r.id),
@@ -974,16 +1006,24 @@ function mapRecurring(r: ApiRecord): RecurringTransaction {
     type,
     amount: Number(r.amount ?? 0),
     accountId: Number(r.account_id),
+    accountName: optionalString(r.account_name),
     categoryId: Number(r.category_id ?? 0),
+    categoryName: optionalString(r.category_name),
     subcategoryId: r.subcategory_id == null ? undefined : Number(r.subcategory_id),
     merchantId: r.merchant_id == null ? undefined : Number(r.merchant_id),
     tagIds: Array.isArray(r.tag_ids) ? r.tag_ids.map(Number).filter(Number.isFinite) : [],
+    recipient: optionalString(r.recipient),
     startDate: fromGoDate(r.start_date),
     endDate: r.end_date ? fromGoDate(r.end_date) : undefined,
+    nextRunAt,
+    daysUntilNextRun,
     frequency: freq,
+    interval: Number(r.interval ?? 1) || 1,
     dayOfMonth: dom,
+    dayOfWeek: dow,
+    timezone: String(r.timezone ?? 'UTC'),
+    status: String(r.status ?? ''),
     isActive: r.status === 'Активен',
-    categoryName: optionalString(r.category_name),
     subcategoryName: optionalString(r.subcategory_name),
     merchantName: optionalString(r.merchant_name),
     tags: Array.isArray(r.tags) ? r.tags.map(String) : [],
@@ -1004,10 +1044,13 @@ export async function createRecurring(input: {
   frequency: string
   startDate: string
   endDate?: string
+  interval?: number
   dayOfMonth?: number
+  dayOfWeek?: number
   subcategoryId?: number
   merchantId?: number
   tagIds?: number[]
+  recipient?: string
   description?: string
 }): Promise<void> {
   if (!input.categoryId) {
@@ -1023,13 +1066,15 @@ export async function createRecurring(input: {
     type: TYPE_TO_RU[input.type] ?? input.type,
     amount: input.amount,
     period_type: periodType,
-    interval: 1,
+    interval: input.interval ?? 1,
     start_date: input.startDate,
     timezone: 'UTC',
     tag_ids: input.tagIds ?? [],
+    recipient: input.recipient ?? null,
     comment: input.name || input.description || null,
   }
   if (input.dayOfMonth) body.day_of_month = input.dayOfMonth
+  if (input.dayOfWeek) body.day_of_week = input.dayOfWeek
   if (input.endDate) body.end_date = input.endDate
   await request<unknown>('POST', '/recurring-transactions', body)
 }
@@ -1043,10 +1088,13 @@ export async function updateRecurring(id: number, input: {
   frequency: string
   startDate: string
   endDate?: string
+  interval?: number
   dayOfMonth?: number
+  dayOfWeek?: number
   subcategoryId?: number
   merchantId?: number
   tagIds?: number[]
+  recipient?: string
   description?: string
 }): Promise<void> {
   const periodType = FREQ_TO_RU[input.frequency] ?? 'Ежемесячно'
@@ -1058,12 +1106,14 @@ export async function updateRecurring(id: number, input: {
     type: TYPE_TO_RU[input.type] ?? input.type,
     amount: input.amount,
     period_type: periodType,
-    interval: 1,
+    interval: input.interval ?? 1,
     start_date: input.startDate,
     tag_ids: input.tagIds ?? [],
+    recipient: input.recipient ?? null,
     comment: input.name || input.description || null,
   }
   if (input.dayOfMonth) body.day_of_month = input.dayOfMonth
+  if (input.dayOfWeek) body.day_of_week = input.dayOfWeek
   if (input.endDate) body.end_date = input.endDate
   await request<unknown>('PATCH', `/recurring-transactions/${id}`, body)
 }

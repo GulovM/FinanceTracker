@@ -12,6 +12,7 @@ import {
   deleteTransaction,
   getTransfers,
 } from "@/lib/api";
+import type { Transaction } from "@/lib/api";
 import TransactionRow from "@/components/shared/TransactionRow";
 import { formatCurrency } from "@/lib/utils";
 import {
@@ -22,6 +23,7 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Eye,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -42,6 +44,7 @@ export default function Transactions() {
   const [page, setPage] = useState(1);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [detailsTx, setDetailsTx] = useState<Transaction | null>(null);
   const queryClient = useQueryClient();
 
   const limit = 20;
@@ -269,12 +272,31 @@ export default function Transactions() {
   const filteredItems = search
     ? items.filter(tx =>
         (tx.description ?? '').toLowerCase().includes(search.toLowerCase()) ||
-        (tx.categoryName ?? '').toLowerCase().includes(search.toLowerCase())
+        (tx.categoryName ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (tx.subcategoryName ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (tx.merchantName ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (tx.recipient ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        tx.tags.some((tag) => tag.toLowerCase().includes(search.toLowerCase()))
       )
     : items;
 
   const hasMore = data?.hasMore ?? false;
   const showPagination = page > 1 || hasMore;
+  const detailRows = detailsTx ? [
+    { label: "ID", value: `#${detailsTx.id}` },
+    { label: "Тип", value: detailsTx.type === "income" ? "Доход" : detailsTx.type === "expense" ? "Расход" : "Перевод" },
+    { label: "Сумма", value: formatCurrency(detailsTx.amount) },
+    { label: "Дата создания", value: detailsTx.createdAt ? new Date(detailsTx.createdAt).toLocaleString("ru-RU") : detailsTx.date },
+    { label: "Обновлена", value: detailsTx.updatedAt ? new Date(detailsTx.updatedAt).toLocaleString("ru-RU") : "Не обновлялась" },
+    { label: "Счёт", value: detailsTx.accountName || accounts.find((a) => a.id === detailsTx.accountId)?.name || "Не указан" },
+    { label: "Категория", value: detailsTx.categoryName || "Без категории" },
+    { label: "Подкатегория", value: detailsTx.subcategoryName || "Без подкатегории" },
+    { label: "Мерчант", value: detailsTx.merchantName || "Без мерчанта" },
+    { label: "Получатель", value: detailsTx.recipient || "Не указан" },
+    { label: "Комментарий", value: detailsTx.description || "Без описания" },
+    { label: "Повторный платёж", value: detailsTx.recurringId ? `#${detailsTx.recurringId}` : "Нет" },
+    { label: "Перевод", value: detailsTx.transferId ? `#${detailsTx.transferId}` : "Нет" },
+  ] : [];
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -338,14 +360,32 @@ export default function Transactions() {
                 <TransactionRow
                   type={tx.type}
                   amount={tx.amount}
-                  description={tx.merchantName || tx.subcategoryName || tx.description}
+                  description={tx.description || tx.merchantName || tx.subcategoryName}
                   date={tx.date}
-                  accountName={accounts.find((a) => a.id === tx.accountId)?.name}
-                  accountColor={accounts.find((a) => a.id === tx.accountId)?.color}
+                  accountName={tx.accountName || accounts.find((a) => a.id === tx.accountId)?.name}
+                  accountColor={tx.accountColor || accounts.find((a) => a.id === tx.accountId)?.color}
                   categoryName={tx.categoryName}
                   categoryColor={tx.categoryColor}
-                  action={tx.type !== "transfer" ? (
+                  categoryIcon={tx.categoryIcon}
+                  subcategoryName={tx.subcategoryName}
+                  merchantName={tx.merchantName}
+                  recipient={tx.recipient}
+                  tags={tx.tags}
+                  onClick={() => setDetailsTx(tx)}
+                  action={(
                     <div className="flex items-center gap-1">
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setDetailsTx(tx);
+                        }}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-primary)] transition-colors"
+                        title="Подробнее"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      {tx.type !== "transfer" && (
+                        <>
                       <button
                         onClick={(event) => {
                           event.stopPropagation();
@@ -368,8 +408,10 @@ export default function Transactions() {
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
+                        </>
+                      )}
                     </div>
-                  ) : null}
+                  )}
                 />
               </motion.div>
             ))}
@@ -405,6 +447,66 @@ export default function Transactions() {
           </div>
         </div>
       )}
+
+      <Dialog open={!!detailsTx} onOpenChange={(open) => { if (!open) setDetailsTx(null); }}>
+        <DialogContent className="sm:max-w-[520px] rounded-2xl p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle className="font-heading text-xl">Информация о транзакции</DialogTitle>
+          </DialogHeader>
+          {detailsTx && (
+            <div className="p-6 space-y-5">
+              <div className="flex items-center justify-between gap-4 rounded-xl bg-[var(--bg-hover)] px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">
+                    {detailsTx.description || detailsTx.merchantName || detailsTx.categoryName || "Без описания"}
+                  </p>
+                  <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                    {detailsTx.type === "income" ? "Доход" : detailsTx.type === "expense" ? "Расход" : "Перевод"}
+                  </p>
+                </div>
+                <span className="text-sm font-mono font-semibold text-[var(--text-primary)]">
+                  {formatCurrency(detailsTx.amount)}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {detailRows.map((row) => (
+                  <div key={row.label} className="min-w-0">
+                    <p className="text-[11px] text-[var(--text-muted)] mb-0.5">{row.label}</p>
+                    <p className="text-sm text-[var(--text-primary)] break-words">{row.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <p className="text-[11px] text-[var(--text-muted)] mb-2">Теги</p>
+                {detailsTx.tags.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {detailsTx.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="px-2 py-1 rounded-lg bg-[var(--bg-hover)] text-xs font-medium text-[var(--text-secondary)]"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-[var(--text-muted)]">Без тегов</p>
+                )}
+              </div>
+
+              <Button
+                variant="outline"
+                onClick={() => setDetailsTx(null)}
+                className="w-full h-11 rounded-xl border-[var(--border-medium)]"
+              >
+                Закрыть
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {(typeFilter === "all" || typeFilter === "transfer") && transfers.length > 0 && (
         <div className="bg-white rounded-2xl border border-[var(--border-light)] shadow-[0_1px_3px_rgba(28,25,23,0.04)] overflow-hidden mt-6">
@@ -463,6 +565,7 @@ export default function Transactions() {
                 <Input
                   type="number"
                   min={0}
+                  step="0.01"
                   value={newTx.amount}
                   onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
                   onChange={(e) => setNewTx({ ...newTx, amount: e.target.value })}
@@ -700,6 +803,7 @@ export default function Transactions() {
                 <Input
                   type="number"
                   min={0}
+                  step="0.01"
                   value={editTx.amount}
                   onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
                   onChange={(e) => setEditTx({ ...editTx, amount: e.target.value })}

@@ -298,6 +298,7 @@ export default function Budgets() {
                 <Input
                   type="number"
                   min={0}
+                  step="0.01"
                   value={budgetLimit === "" ? String(budget.totalLimit) : budgetLimit}
                   onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
                   onChange={(e) => setBudgetLimit(e.target.value)}
@@ -400,6 +401,7 @@ export default function Budgets() {
                 <Input
                   type="number"
                   min={0}
+                  step="0.01"
                   value={newBudget.totalLimit}
                   onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
                   onChange={(e) => setNewBudget({ ...newBudget, totalLimit: e.target.value })}
@@ -441,6 +443,7 @@ export default function Budgets() {
                       <Input
                         type="number"
                         min={0}
+                        step="0.01"
                         value={cl.limit}
                         onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
                         onChange={(e) => {

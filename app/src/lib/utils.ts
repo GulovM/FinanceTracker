@@ -9,8 +9,8 @@ export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
     style: 'currency',
     currency: 'TJS',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2,
   }).format(amount);
 }
 
@@ -19,9 +19,9 @@ export function formatCurrencyShort(amount: number): string {
     return `TJS ${(amount / 1000000).toFixed(1)}M`;
   }
   if (amount >= 1000) {
-    return `TJS ${(amount / 1000).toFixed(0)}K`;
+    return `TJS ${(amount / 1000).toFixed(amount % 1000 === 0 ? 0 : 1)}K`;
   }
-  return `TJS ${amount}`;
+  return formatCurrency(amount);
 }
 
 export function formatDate(dateStr: string | Date): string {

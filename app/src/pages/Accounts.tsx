@@ -263,6 +263,7 @@ export default function Accounts() {
                 <Input
                   type="number"
                   min={0}
+                  step="0.01"
                   value={newAccount.balance}
                   onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
                   onChange={(e) => setNewAccount({ ...newAccount, balance: e.target.value })}
@@ -390,6 +391,7 @@ export default function Accounts() {
                   <Input
                     type="number"
                     min={0}
+                    step="0.01"
                     value={accountDraft.balance}
                     onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
                     onChange={(e) => setAccountDraft({ ...accountDraft, balance: e.target.value })}
@@ -410,6 +412,7 @@ export default function Accounts() {
                 <Input
                   type="number"
                   min={0}
+                  step="0.01"
                   value={operationAmount}
                   onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
                   onChange={(e) => setOperationAmount(e.target.value)}

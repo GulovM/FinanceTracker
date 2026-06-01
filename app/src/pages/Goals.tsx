@@ -15,6 +15,7 @@ import {
   createSubcategory,
   createTransaction,
 } from "@/lib/api";
+import type { Goal } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 import {
   Plus,
@@ -50,6 +51,7 @@ export default function Goals() {
 
   const [currentTime] = useState(() => Date.now());
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [isContributeOpen, setIsContributeOpen] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<number | null>(null);
   const selectedGoalData = goals.find((goal) => goal.id === selectedGoal);
@@ -132,6 +134,8 @@ export default function Goals() {
     }) => updateGoal(id, { name, targetAmount, targetDate, priority }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goals'] });
+      setIsEditOpen(false);
+      resetEditForm();
     },
   });
 
@@ -159,6 +163,13 @@ export default function Goals() {
     currentAmount: "",
     priority: "",
   });
+  const [editGoal, setEditGoal] = useState({
+    id: 0,
+    name: "",
+    targetAmount: "",
+    targetDate: "",
+    priority: "",
+  });
   const [contributeAmount, setContributeAmount] = useState("");
   const [contributeAccountId, setContributeAccountId] = useState("");
 
@@ -168,6 +179,10 @@ export default function Goals() {
 
   const resetForm = () => {
     setNewGoal({ name: "", targetAmount: "", targetDate: "", color: "#0E7490", icon: "target", currentAmount: "", priority: "" });
+  };
+
+  const resetEditForm = () => {
+    setEditGoal({ id: 0, name: "", targetAmount: "", targetDate: "", priority: "" });
   };
 
   const handleCreate = () => {
@@ -180,6 +195,28 @@ export default function Goals() {
       icon: newGoal.icon,
       currentAmount: newGoal.currentAmount ? Number(newGoal.currentAmount) : undefined,
       priority: newGoal.priority ? Number(newGoal.priority) : undefined,
+    });
+  };
+
+  const openEditGoal = (goal: Goal) => {
+    setEditGoal({
+      id: goal.id,
+      name: goal.name,
+      targetAmount: String(goal.targetAmount),
+      targetDate: goal.targetDate || "",
+      priority: goal.priority ? String(goal.priority) : "",
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleUpdateGoal = () => {
+    if (!editGoal.id || !editGoal.name || !editGoal.targetAmount) return;
+    updateMut.mutate({
+      id: editGoal.id,
+      name: editGoal.name,
+      targetAmount: Number(editGoal.targetAmount),
+      targetDate: editGoal.targetDate || undefined,
+      priority: editGoal.priority ? Number(editGoal.priority) : undefined,
     });
   };
 
@@ -252,21 +289,7 @@ export default function Goals() {
                 </div>
                 <div className="flex gap-1">
                   <button
-                    onClick={() => {
-                      const name = prompt("Название цели", goal.name);
-                      if (!name) return;
-                      const amount = prompt("Целевая сумма", String(goal.targetAmount));
-                      if (!amount) return;
-                      const priorityStr = prompt("Приоритет (1 — Высокий, 2 — Средний, 3 — Низкий)", String(goal.priority ?? ""));
-                      const priority = priorityStr ? Number(priorityStr) : undefined;
-                      updateMut.mutate({
-                        id: goal.id,
-                        name,
-                        targetAmount: Number(amount),
-                        targetDate: goal.targetDate,
-                        priority: priority && priority >= 1 && priority <= 3 ? priority : goal.priority,
-                      });
-                    }}
+                    onClick={() => openEditGoal(goal)}
                     className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
                     title="Изменить"
                   >
@@ -369,6 +392,7 @@ export default function Goals() {
                 <Input
                   type="number"
                   min={0}
+                  step="0.01"
                   value={newGoal.targetAmount}
                   onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
                   onChange={(e) => setNewGoal({ ...newGoal, targetAmount: e.target.value })}
@@ -393,6 +417,7 @@ export default function Goals() {
                 <Input
                   type="number"
                   min={0}
+                  step="0.01"
                   value={newGoal.currentAmount}
                   onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
                   onChange={(e) => setNewGoal({ ...newGoal, currentAmount: e.target.value })}
@@ -454,6 +479,91 @@ export default function Goals() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Goal Modal */}
+      <Dialog open={isEditOpen} onOpenChange={(open) => {
+        setIsEditOpen(open);
+        if (!open) resetEditForm();
+      }}>
+        <DialogContent className="sm:max-w-[420px] rounded-2xl p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle className="font-heading text-xl">Редактировать цель</DialogTitle>
+          </DialogHeader>
+          <div className="p-6 space-y-4">
+            <div>
+              <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Название</Label>
+              <Input
+                value={editGoal.name}
+                onChange={(e) => setEditGoal({ ...editGoal, name: e.target.value })}
+                placeholder="Например: Новый ноутбук"
+                className="h-11 rounded-xl"
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Целевая сумма</Label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={editGoal.targetAmount}
+                  onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
+                  onChange={(e) => setEditGoal({ ...editGoal, targetAmount: e.target.value })}
+                  className="h-11 rounded-xl pr-12"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)]">TJS</span>
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Целевая дата</Label>
+              <Input
+                type="date"
+                value={editGoal.targetDate}
+                onChange={(e) => setEditGoal({ ...editGoal, targetDate: e.target.value })}
+                className="h-11 rounded-xl"
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-[var(--text-muted)] mb-1.5 block">Приоритет</Label>
+              <Select
+                value={editGoal.priority || "none"}
+                onValueChange={(v) => setEditGoal({ ...editGoal, priority: v === "none" ? "" : v })}
+              >
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Без приоритета" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Без приоритета</SelectItem>
+                  <SelectItem value="1">Высокий</SelectItem>
+                  <SelectItem value="2">Средний</SelectItem>
+                  <SelectItem value="3">Низкий</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {updateMut.isError && (
+              <p className="text-xs text-[var(--accent-tertiary)]">
+                {(updateMut.error as Error)?.message ?? "Ошибка сохранения"}
+              </p>
+            )}
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsEditOpen(false)}
+                className="flex-1 h-11 rounded-xl border-[var(--border-medium)]"
+              >
+                Отмена
+              </Button>
+              <Button
+                onClick={handleUpdateGoal}
+                disabled={!editGoal.name || !editGoal.targetAmount || updateMut.isPending}
+                className="flex-1 h-11 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white"
+              >
+                {updateMut.isPending ? "Сохранение..." : "Сохранить"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Contribute Modal */}
       <Dialog open={isContributeOpen} onOpenChange={(open) => {
         setIsContributeOpen(open);
@@ -490,6 +600,7 @@ export default function Goals() {
                 <Input
                   type="number"
                   min={0}
+                  step="0.01"
                   value={contributeAmount}
                   onKeyDown={(e) => { if (e.key === '-') e.preventDefault() }}
                   onChange={(e) => setContributeAmount(e.target.value)}

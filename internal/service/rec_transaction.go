@@ -1,8 +1,8 @@
 package service
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"errors"
 	"fmt"
@@ -136,9 +136,13 @@ func (s *Service) CreateRecTransaction(ctx context.Context, recTransaction *doma
 }
 
 func (s *Service) UpdateRecTransaction(ctx context.Context, recTransaction *domain.UpdateRecTransaction) error {
-	_, err := s.GetRecTransactionByID(ctx, recTransaction.UserID, recTransaction.ID)
+	current, err := s.GetRecTransactionByID(ctx, recTransaction.UserID, recTransaction.ID)
 	if err != nil {
 		return fmt.Errorf("s.GetRecTransactionByID error: %w", err)
+	}
+
+	if recTransaction.Amount <= 0 {
+		return fmt.Errorf("amount must be greater than zero")
 	}
 
 	if _, err = s.accounts.GetAccountByID(ctx, recTransaction.UserID, recTransaction.AccountID); err != nil {
@@ -175,6 +179,33 @@ func (s *Service) UpdateRecTransaction(ctx context.Context, recTransaction *doma
 	}
 
 	recTransaction.Type = ctg.Type
+	loc, err := time.LoadLocation(current.Timezone)
+	if err != nil {
+		return fmt.Errorf("invalid timezone: %w", err)
+	}
+
+	start := time.Date(
+		recTransaction.StartDate.Year(),
+		recTransaction.StartDate.Month(),
+		recTransaction.StartDate.Day(),
+		9, 0, 0, 0,
+		loc,
+	)
+
+	nextRunAt := alignFirstRun(start, recTransaction.PeriodType, recTransaction.DayOfMonth, recTransaction.DayOfWeek, recTransaction.EndDate, loc)
+	if nextRunAt.IsZero() {
+		return fmt.Errorf("cannot compute next_run_at from start date")
+	}
+
+	now := time.Now().In(loc)
+	for !nextRunAt.After(now) {
+		nextRunAt = computeNextRun(nextRunAt, recTransaction.PeriodType, recTransaction.Interval, recTransaction.DayOfMonth, recTransaction.DayOfWeek, recTransaction.EndDate, loc)
+		if nextRunAt.IsZero() {
+			return fmt.Errorf("cannot compute next_run_at")
+		}
+	}
+	recTransaction.NextRunAt = nextRunAt
+
 	err = s.recTx.UpdateRecTransaction(ctx, recTransaction)
 	if err != nil {
 		return fmt.Errorf("s.recTx.UpdateRecTransaction error: %w", err)
