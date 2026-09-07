@@ -1,0 +1,53 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Go build artifacts and local caches
+.gocache/
+.gomodcache/
+.gotmp/
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.prof
+*.coverprofile
+
+# Node.js and frontend build artifacts
+**/node_modules/
+**/dist/
+**/dist-ssr/
+**/build/
+*.tsbuildinfo
+.cache/
+
+# Test reports and local databases
+coverage/
+.nyc_output/
+*.sqlite
+*.sqlite3
+*.db
+
+# Runtime logs and temporary files
+*.log
+logs/
+tmp/
+temp/
+
+# IDE and OS files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
