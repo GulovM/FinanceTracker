@@ -90,7 +90,7 @@ jobs:
           k8s_ca_cert: ${{ secrets.K8S_CA_CERT }}
         
       - name: Update deployment image and apply
-        runs: |
+        run: |
           # Преобразуем имя репозитория в нижний регистр для ghcr
           REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           IMAGE="ghcr.io/${REPO_LOWER}:sha-${{ github.sha }}"
