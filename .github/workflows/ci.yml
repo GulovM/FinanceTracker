@@ -86,8 +86,7 @@ jobs:
         with:
           method: service-account
           k8s-url: ${{ secrets.K8S_SERVER_URL }}
-          k8s-secret: ${{ secrets.K8S_TOKEN }}
-          k8s_ca_cert: ${{ secrets.K8S_CA_CERT }}
+          k8s-secret: ${{ secrets.K8S_SECRET_YAML }}
         
       - name: Update deployment image and apply
         run: |
