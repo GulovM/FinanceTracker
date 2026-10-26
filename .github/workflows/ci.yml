@@ -65,4 +65,38 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+  
+  deploy:
+    name: Deploy to Kubernetes
+    needs: build
     
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+        
+      - name: Configure kubectl context
+        uses: azure/k8s-set-context@v4
+        with:
+          method: service-account
+          k8s-url: ${{ secrets.K8S_SERVER_URL }}
+          k8s-secret: ${{ secrets.K8S_TOKEN }}
+          k8s_ca_cert: ${{ secrets.K8S_CA_CERT }}
+        
+      - name: Update deployment image and apply
+        runs: |
+          # Преобразуем имя репозитория в нижний регистр для ghcr
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/${REPO_LOWER}:sha-${{ github.sha }}"
+
+          kubectl apply -f k8s/deployment/deployment.yml
+
+          kubectl set image deployment/my-app app=$IMAGE -n production
+
+          kubectl rollout status deployment/my-app -n production --timeout=120s
