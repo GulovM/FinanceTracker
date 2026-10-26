@@ -89,14 +89,17 @@ jobs:
           k8s-secret: ${{ secrets.K8S_SECRET_YAML }}
         
       - name: Update deployment image and apply
-        shell: bash
+        shell: powershell
         run: |
           # Преобразуем имя репозитория в нижний регистр для ghcr
-          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE="ghcr.io/${REPO_LOWER}:sha-${{ github.sha }}"
+          $repoLower = "${{ github.repository }}".ToLower()
+          $image = "ghcr.io/${repoLower}:sha-${{ github.sha }}"
 
           kubectl apply -f k8s/deployment/deployment.yml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-          kubectl set image deployment/my-app app=$IMAGE -n production
+          kubectl set image deployment/my-app app=$image -n production
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
           kubectl rollout status deployment/my-app -n production --timeout=120s
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
