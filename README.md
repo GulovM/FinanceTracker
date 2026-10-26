@@ -143,8 +143,9 @@ Workflow [.github/workflows/ci.yml](.github/workflows/ci.yml) запускает
 
 Ограничения текущего манифеста:
 
-- `deployment.yml` не передаёт контейнеру переменные окружения (`JWT_SECRET`, параметры БД), поэтому без их добавления (например, через `Secret`) pod не запустится;
-- манифест не содержит `Service`/`Ingress` и PostgreSQL — их нужно развернуть отдельно;
+- `deployment.yml` берёт `JWT_SECRET` и параметры БД из `Secret` `app-env` (`envFrom`), а `CORS_ALLOWED_ORIGIN` задаёт значением. Шаблон Secret — [k8s/secret/secret.example.yml](k8s/secret/secret.example.yml). Создайте его в кластере один раз вручную с реальными значениями (команда `kubectl create secret generic app-env -n production ...` приведена в шаблоне) и не коммитьте настоящий Secret. Без этого Secret pod не запустится. `PORT` задавать не нужно: Nginx проксирует на порт API по умолчанию `8080`. Не вшивайте секреты в образ: он публикуется в GHCR;
+- [k8s/service/service.yml](k8s/service/service.yml) создаёт `Service` `my-service` типа NodePort: порт 8088 в кластере, nodePort `30080`, целевой порт контейнера 80. Манифест не применяется workflow автоматически — выполните `kubectl apply -f k8s/service/service.yml` вручную, а права `github-deployer` на `services` уже есть в роли;
+- PostgreSQL и `Ingress` в манифестах отсутствуют, БД нужно развернуть отдельно;
 - образ в манифесте указан с фиксированным тегом; актуальный тег выставляет шаг `kubectl set image`.
 
 ## Проверка качества

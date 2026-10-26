@@ -37,18 +37,9 @@ func NewPostgresPgxConf() (*pgxpool.Pool, error) {
 	defer cancel()
 
 	user := os.Getenv("POSTGRES_USER")
-	if user == "" {
-		user = os.Getenv("DB_USER")
-	}
 	pass := os.Getenv("POSTGRES_PASSWORD")
-	if pass == "" {
-		pass = os.Getenv("DB_PASSWORD")
-	}
 	host := os.Getenv("DB_HOST")
 	name := os.Getenv("POSTGRES_DB")
-	if name == "" {
-		name = os.Getenv("DB_NAME")
-	}
 
 	// url.URL экранирует спецсимволы в пароле, которые ломали строку формата "%s:%s@%v/%s"
 	dsn := (&url.URL{

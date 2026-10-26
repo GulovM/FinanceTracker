@@ -30,4 +30,4 @@ var/
 .env
 .env.*
 internal/config/.env
-
+secret.yml
