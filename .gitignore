@@ -52,3 +52,4 @@ var/
 .DS_Store
 Thumbs.db
 Desktop.ini
+actions-runner/
