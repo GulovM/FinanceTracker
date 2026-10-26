@@ -44,7 +44,7 @@ Full-stack приложение для учёта личных финансов.
 │   ├── src/hooks/           # useAuth и вспомогательные хуки
 │   ├── src/providers/       # провайдер TanStack Query
 │   └── src/lib/api.ts       # клиент REST API
-├── k8s/                     # манифесты Kubernetes (Deployment, ServiceAccount/RBAC)
+├── k8s/                     # манифесты Kubernetes: deployment, postgres, pvc, secret (шаблон), service, serviceAccount
 ├── .github/workflows/       # CI/CD (GitHub Actions)
 ├── dockerfile               # сборка единого образа: Nginx + SPA + Go API
 ├── docker-compose.yaml      # приложение + PostgreSQL для локального запуска
@@ -147,6 +147,8 @@ Workflow [.github/workflows/ci.yml](.github/workflows/ci.yml) запускает
 - [k8s/service/service.yml](k8s/service/service.yml) создаёт `Service` `my-service` типа NodePort: порт 8088 в кластере, nodePort `30080`, целевой порт контейнера 80. Манифест не применяется workflow автоматически — выполните `kubectl apply -f k8s/service/service.yml` вручную, а права `github-deployer` на `services` уже есть в роли;
 - PostgreSQL запускается отдельно от приложения: [k8s/postgres/postgres.yml](k8s/postgres/postgres.yml) содержит `StatefulSet` (одна реплика) и headless-`Service` `postgres`, а данные лежат на PVC `app-data` из [k8s/pvc/pvc.yml](k8s/pvc/pvc.yml). В Secret `app-env` задайте `DB_HOST=postgres:5432`. Приложение ждёт доступности БД в `initContainer`. У StorageClass `standard` политика `Delete`, поэтому удаление PVC стирает данные;
 - порядок первого развёртывания (CI применяет только `deployment.yml`): `kubectl apply -f k8s/secret/secret.yml -f k8s/pvc/pvc.yml -f k8s/postgres/postgres.yml -f k8s/service/service.yml`, затем деплой из CI. Локальный `secret.yml` создаётся из шаблона и находится в `.gitignore`;
+- переменные окружения читаются только при старте контейнера: после изменения Secret выполните `kubectl -n production rollout restart deploy/my-app` (для БД — `rollout restart statefulset/postgres`);
+- доступ к приложению в локальном кластере Docker Desktop: NodePort `30080` с хоста обычно недоступен, так как нода работает внутри контейнера. Используйте `kubectl -n production port-forward svc/my-service 8080:8088` и откройте `http://localhost:8080`. Проброс привязан к конкретному поду, поэтому после перезапуска подов его нужно запустить заново, иначе запросы к API завершаются ошибкой `NetworkError`;
 - `Ingress` в манифестах нет;
 - образ в манифесте указан с фиксированным тегом; актуальный тег выставляет шаг `kubectl set image`.
 
