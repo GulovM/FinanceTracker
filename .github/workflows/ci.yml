@@ -89,6 +89,7 @@ jobs:
           k8s-secret: ${{ secrets.K8S_SECRET_YAML }}
         
       - name: Update deployment image and apply
+        shell: bash
         run: |
           # Преобразуем имя репозитория в нижний регистр для ghcr
           REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
