@@ -1,4 +1,4 @@
-﻿package repo
+package repo
 
 import (
 	"Project/internal/domain"
@@ -85,6 +85,9 @@ func (r *Repository) GetEvents(ctx context.Context, f *domain.EventFilter) ([]*d
 			return nil, scan_err(err)
 		}
 		events = append(events, e.ToEntity())
+	}
+	if err := rows.Err(); err != nil {
+		return nil, scan_err(err)
 	}
 	return events, nil
 }

@@ -6,6 +6,8 @@ import (
 	"Project/internal/logger"
 	"errors"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -62,9 +64,16 @@ func NewHandler(deps Deps) *Handler {
 
 func (h *Handler) InitRoutes() *gin.Engine {
 	router := gin.New()
+	router.Use(gin.Recovery())
+
+	// по умолчанию разрешаем любой origin, для продакшена задаётся CORS_ALLOWED_ORIGIN
+	allowedOrigin := os.Getenv("CORS_ALLOWED_ORIGIN")
+	if allowedOrigin == "" {
+		allowedOrigin = "*"
+	}
 
 	router.Use(func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Origin", allowedOrigin)
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type")
 		if c.Request.Method == "OPTIONS" {
@@ -192,6 +201,16 @@ func (h *Handler) InitRoutes() *gin.Engine {
 	return router
 }
 
+// publicMessage отдаёт клиенту текст ошибки начиная с sentinel,
+// отбрасывая внутреннюю цепочку обёрток вида "s.merchants.CreateMerchant error: ...".
+func publicMessage(err, sentinel error) string {
+	msg := err.Error()
+	if i := strings.Index(msg, sentinel.Error()); i >= 0 {
+		return msg[i:]
+	}
+	return msg
+}
+
 func writeError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, errs.ErrInvalidCredentials):
@@ -200,6 +219,16 @@ func writeError(c *gin.Context, err error) {
 		c.JSON(http.StatusNotFound, gin.H{"error": errs.ErrNotFound.Error()})
 	case errors.Is(err, errs.ErrUserExist):
 		c.JSON(http.StatusConflict, gin.H{"error": errs.ErrUserExist.Error()})
+	case errors.Is(err, errs.ErrInvalidPassword):
+		c.JSON(http.StatusBadRequest, gin.H{"error": errs.ErrInvalidPassword.Error()})
+	case errors.Is(err, errs.ErrUnauthorized):
+		c.JSON(http.StatusUnauthorized, gin.H{"error": errs.ErrUnauthorized.Error()})
+	case errors.Is(err, errs.ErrInvalidInput):
+		c.JSON(http.StatusBadRequest, gin.H{"error": publicMessage(err, errs.ErrInvalidInput)})
+	case errors.Is(err, errs.ErrInsufficientFunds):
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": errs.ErrInsufficientFunds.Error()})
+	case errors.Is(err, errs.ErrForbidden):
+		c.JSON(http.StatusForbidden, gin.H{"error": publicMessage(err, errs.ErrForbidden)})
 	default:
 		logger.Log.Error().Err(err).Msg("internal error")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errs.ErrIntSrv.Error()})

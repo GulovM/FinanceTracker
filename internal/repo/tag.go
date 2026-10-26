@@ -1,8 +1,8 @@
 package repo
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"errors"
 	"fmt"
@@ -62,6 +62,9 @@ func (r *Repository) GetTags(ctx context.Context, userID int) ([]*domain.Tag, er
 			return nil, scan_err(err)
 		}
 		tags = append(tags, tag.ToEntity())
+	}
+	if err := rows.Err(); err != nil {
+		return nil, scan_err(err)
 	}
 	return tags, nil
 }

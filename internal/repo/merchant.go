@@ -1,8 +1,8 @@
 package repo
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"errors"
 	"fmt"
@@ -66,6 +66,9 @@ func (r *Repository) GetMerchants(ctx context.Context, userID int) ([]*domain.Me
 			return nil, scan_err(err)
 		}
 		merchants = append(merchants, merchant.ToEntity())
+	}
+	if err := rows.Err(); err != nil {
+		return nil, scan_err(err)
 	}
 	return merchants, nil
 }

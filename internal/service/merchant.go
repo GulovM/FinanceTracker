@@ -1,12 +1,11 @@
 package service
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"errors"
 	"fmt"
-
 )
 
 // создание мерчант
@@ -26,7 +25,7 @@ func (s *Service) GetMerchants(ctx context.Context, userID int) ([]*domain.Merch
 
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return nil, fmt.Errorf("no rows select")
+			return []*domain.Merchant{}, nil
 		}
 		return nil, fmt.Errorf("s.merchants.GetMerchants error: %w", err)
 	}
@@ -39,7 +38,7 @@ func (s *Service) UpdateMerchant(ctx context.Context, merchant *domain.UpdateMer
 	_, err := s.merchants.GetMerchantByID(ctx, merchant.ID, merchant.UserID)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("a merchant with this ID does not exist")
+			return fmt.Errorf("merchant %w", errs.ErrNotFound)
 		}
 		return fmt.Errorf("s.merchants.GetMerchantByID error: %w", err)
 	}
@@ -57,7 +56,7 @@ func (s *Service) DeleteMerchant(ctx context.Context, merchantID, userID int) er
 	_, err := s.merchants.GetMerchantByID(ctx, merchantID, userID)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("a merchant with this ID does not exist")
+			return fmt.Errorf("merchant %w", errs.ErrNotFound)
 		}
 		return fmt.Errorf("s.merchants.GetMerchantByID error: %w", err)
 	}

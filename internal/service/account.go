@@ -1,12 +1,11 @@
 package service
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"errors"
 	"fmt"
-
 )
 
 // создание кошелька
@@ -23,7 +22,7 @@ func (s *Service) UpdateAccount(ctx context.Context, updateAccount *domain.Updat
 	_, err := s.accounts.GetAccountByID(ctx, updateAccount.UserID, updateAccount.ID)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("account not found")
+			return fmt.Errorf("account %w", errs.ErrNotFound)
 		}
 		return fmt.Errorf("s.accounts.GetAccountByID error: %w", err)
 	}
@@ -40,7 +39,7 @@ func (s *Service) TopupAccount(ctx context.Context, updateAccount *domain.Change
 	_, err := s.accounts.GetAccountByID(ctx, updateAccount.UserID, updateAccount.ID)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("account not found")
+			return fmt.Errorf("account %w", errs.ErrNotFound)
 		}
 		return fmt.Errorf("s.accounts.GetAccountByID error: %w", err)
 	}
@@ -57,13 +56,13 @@ func (s *Service) WithdrowAccount(ctx context.Context, updateAccount *domain.Cha
 	acc, err := s.accounts.GetAccountByID(ctx, updateAccount.UserID, updateAccount.ID)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("account not found")
+			return fmt.Errorf("account %w", errs.ErrNotFound)
 		}
 		return fmt.Errorf("s.accounts.GetAccountByID error: %w", err)
 	}
 
 	if acc.Balance < updateAccount.Balance {
-		return fmt.Errorf("negative balance will be")
+		return errs.ErrInsufficientFunds
 	}
 	err = s.accounts.WithdrowAccount(ctx, updateAccount)
 	if err != nil {
@@ -89,7 +88,7 @@ func (s *Service) GetAccountByID(ctx context.Context, userID, id int) (*domain.A
 	accountDB, err := s.accounts.GetAccountByID(ctx, userID, id)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return nil, fmt.Errorf("account not found")
+			return nil, fmt.Errorf("account %w", errs.ErrNotFound)
 		}
 		return nil, fmt.Errorf("s.accounts.GetAccountByID: %w", err)
 	}
@@ -101,7 +100,7 @@ func (s *Service) DeleteAccount(ctx context.Context, userID, id int) error {
 	_, err := s.accounts.GetAccountByID(ctx, userID, id)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("account not found")
+			return fmt.Errorf("account %w", errs.ErrNotFound)
 		}
 		return fmt.Errorf("s.accounts.GetAccountByID error: %w", err)
 	}

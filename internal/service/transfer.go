@@ -1,43 +1,43 @@
 package service
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"errors"
 	"fmt"
-
 )
 
-func (s *Service) CreateTransfer(ctx context.Context, createTransfer *domain.CreateTransfer) error {
+func (s *Service) CreateTransfer(ctx context.Context, createTransfer *domain.CreateTransfer) (err error) {
+	if createTransfer.Amount <= 0 {
+		return fmt.Errorf("%w: amount must be greater than zero", errs.ErrInvalidInput)
+	}
+	if createTransfer.From_acc_ID == createTransfer.To_acc_ID {
+		return fmt.Errorf("%w: source and destination accounts must differ", errs.ErrInvalidInput)
+	}
+
 	tx, err := s.tx.BeginTx(ctx)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		} else {
-			_ = tx.Commit(ctx)
-		}
-	}()
+	defer finishTx(ctx, tx, &err)
 
 	acc, err := s.accounts.GetAccountByIDTx(ctx, tx, createTransfer.UserID, createTransfer.From_acc_ID)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("account from not found")
+			return fmt.Errorf("source account %w", errs.ErrNotFound)
 		}
 		return fmt.Errorf("s.accounts.GetAccountByIDTx error: %w", err)
 	}
 
 	if acc.Balance < createTransfer.Amount {
-		return fmt.Errorf("negative balance will be")
+		return errs.ErrInsufficientFunds
 	}
 
 	_, err = s.accounts.GetAccountByIDTx(ctx, tx, createTransfer.UserID, createTransfer.To_acc_ID)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("account to not found")
+			return fmt.Errorf("destination account %w", errs.ErrNotFound)
 		}
 		return fmt.Errorf("s.accounts.GetAccountByIDTx error: %w", err)
 	}
@@ -71,7 +71,7 @@ func (s *Service) CreateTransfer(ctx context.Context, createTransfer *domain.Cre
 	createTransactionW := domain.CreateTransaction{
 		UserID:     createTransfer.UserID,
 		AccountID:  createTransfer.From_acc_ID,
-		CategoryID: 13,
+		CategoryID: domain.TransferCategoryID,
 		Type:       "Перевод",
 		Amount:     createTransfer.Amount,
 		TransferID: id,
@@ -83,7 +83,7 @@ func (s *Service) CreateTransfer(ctx context.Context, createTransfer *domain.Cre
 	createTransactionT := domain.CreateTransaction{
 		UserID:     createTransfer.UserID,
 		AccountID:  createTransfer.To_acc_ID,
-		CategoryID: 13,
+		CategoryID: domain.TransferCategoryID,
 		Type:       "Перевод",
 		Amount:     createTransfer.Amount,
 		TransferID: id,
@@ -101,7 +101,7 @@ func (s *Service) GetTransfers(ctx context.Context, filter domain.TransfersFilte
 
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return nil, fmt.Errorf("no rows selected")
+			return []*domain.TransferFull{}, nil
 		}
 		return nil, fmt.Errorf("s.transfers.GetTransfers error: %w", err)
 	}
@@ -114,7 +114,7 @@ func (s *Service) GetTranferByID(ctx context.Context, userID, id int) (*domain.T
 	transfer, err := s.transfers.GetTranferByID(ctx, userID, id)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return nil, fmt.Errorf("no transfer with this id founded")
+			return nil, fmt.Errorf("transfer %w", errs.ErrNotFound)
 		}
 		return nil, fmt.Errorf("s.transfers.GetTranferByID error: %w", err)
 	}

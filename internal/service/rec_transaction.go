@@ -35,7 +35,7 @@ func (s *Service) GetRecTransactionByID(ctx context.Context, userID, id int) (*d
 
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return nil, fmt.Errorf("recurring transaction not found")
+			return nil, fmt.Errorf("recurring transaction %w", errs.ErrNotFound)
 		}
 		return nil, fmt.Errorf("s.recTx.GetRecTransactionByID error: %w", err)
 	}
@@ -43,26 +43,20 @@ func (s *Service) GetRecTransactionByID(ctx context.Context, userID, id int) (*d
 	return rec_transaction, nil
 }
 
-func (s *Service) CreateRecTransaction(ctx context.Context, recTransaction *domain.CreateRecTransaction) error {
+func (s *Service) CreateRecTransaction(ctx context.Context, recTransaction *domain.CreateRecTransaction) (err error) {
 	if recTransaction == nil {
-		return fmt.Errorf("transaction payload is required")
+		return fmt.Errorf("%w: transaction payload is required", errs.ErrInvalidInput)
 	}
 
 	if recTransaction.Amount <= 0 {
-		return fmt.Errorf("amount must be greater than zero")
+		return fmt.Errorf("%w: amount must be greater than zero", errs.ErrInvalidInput)
 	}
 
 	tx, err := s.tx.BeginTx(ctx)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		} else {
-			_ = tx.Commit(ctx)
-		}
-	}()
+	defer finishTx(ctx, tx, &err)
 
 	if _, err = s.accounts.GetAccountByIDTx(ctx, tx, recTransaction.UserID, recTransaction.AccountID); err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
@@ -114,14 +108,14 @@ func (s *Service) CreateRecTransaction(ctx context.Context, recTransaction *doma
 
 	nextRunAt := alignFirstRun(start, recTransaction.PeriodType, recTransaction.DayOfMonth, recTransaction.DayOfWeek, recTransaction.EndDate, loc)
 	if nextRunAt.IsZero() {
-		return fmt.Errorf("cannot compute next_run_at from start date")
+		return fmt.Errorf("%w: cannot compute next_run_at from start date", errs.ErrInvalidInput)
 	}
 
 	now := time.Now().In(loc)
 	for !nextRunAt.After(now) {
 		nextRunAt = computeNextRun(nextRunAt, recTransaction.PeriodType, recTransaction.Interval, recTransaction.DayOfMonth, recTransaction.DayOfWeek, recTransaction.EndDate, loc)
 		if nextRunAt.IsZero() {
-			return fmt.Errorf("cannot compute next_run_at")
+			return fmt.Errorf("%w: cannot compute next_run_at", errs.ErrInvalidInput)
 		}
 	}
 
@@ -142,7 +136,7 @@ func (s *Service) UpdateRecTransaction(ctx context.Context, recTransaction *doma
 	}
 
 	if recTransaction.Amount <= 0 {
-		return fmt.Errorf("amount must be greater than zero")
+		return fmt.Errorf("%w: amount must be greater than zero", errs.ErrInvalidInput)
 	}
 
 	if _, err = s.accounts.GetAccountByID(ctx, recTransaction.UserID, recTransaction.AccountID); err != nil {
@@ -194,14 +188,14 @@ func (s *Service) UpdateRecTransaction(ctx context.Context, recTransaction *doma
 
 	nextRunAt := alignFirstRun(start, recTransaction.PeriodType, recTransaction.DayOfMonth, recTransaction.DayOfWeek, recTransaction.EndDate, loc)
 	if nextRunAt.IsZero() {
-		return fmt.Errorf("cannot compute next_run_at from start date")
+		return fmt.Errorf("%w: cannot compute next_run_at from start date", errs.ErrInvalidInput)
 	}
 
 	now := time.Now().In(loc)
 	for !nextRunAt.After(now) {
 		nextRunAt = computeNextRun(nextRunAt, recTransaction.PeriodType, recTransaction.Interval, recTransaction.DayOfMonth, recTransaction.DayOfWeek, recTransaction.EndDate, loc)
 		if nextRunAt.IsZero() {
-			return fmt.Errorf("cannot compute next_run_at")
+			return fmt.Errorf("%w: cannot compute next_run_at", errs.ErrInvalidInput)
 		}
 	}
 	recTransaction.NextRunAt = nextRunAt
@@ -329,7 +323,7 @@ func computeNextRun(
 		}
 
 		year, month, _ := current.Date()
-		month = month + time.Month(interval)
+		month += time.Month(interval)
 
 		for month > 12 {
 			month -= 12
@@ -446,6 +440,16 @@ func (s *Service) ProcessDueRecurringTransactions(ctx context.Context) error {
 }
 
 func (s *Service) processOneRecurring(ctx context.Context, tx pgx.Tx, rtr *domain.RecTransactionFull) error {
+	// 0. Берём блокировку расписания: если его уже обработал другой экземпляр
+	// или его поставили на паузу после выборки, пропускаем, чтобы не списать дважды
+	due, err := s.recTx.LockDueRecurringTx(ctx, tx, rtr.ID)
+	if err != nil {
+		return fmt.Errorf("lock recurring: %w", err)
+	}
+	if !due {
+		return nil
+	}
+
 	// 1. Создаём транзакцию
 	tr := domain.CreateTransaction{
 		UserID:        rtr.UserID,

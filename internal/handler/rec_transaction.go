@@ -1,4 +1,4 @@
-﻿package handler
+package handler
 
 import (
 	"Project/internal/domain"
@@ -29,8 +29,7 @@ func (h *Handler) GetRecTransactions(c *gin.Context) {
 
 	rec_trs, err := h.recTx.GetRecTransactions(c, userID)
 	if err != nil {
-		fmt.Println("h.recTx.GetRecTransactions error:", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		writeError(c, err)
 		return
 	}
 
@@ -46,8 +45,7 @@ func (h *Handler) GetRecTransactionsList(c *gin.Context) {
 
 	items, err := h.recTx.GetRecTransactionsList(c, userID)
 	if err != nil {
-		fmt.Println("h.recTx.GetRecTransactionsList error:", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeError(c, err)
 		return
 	}
 
@@ -73,8 +71,7 @@ func (h *Handler) GetRecTransactionByID(c *gin.Context) {
 
 	rec_tr, err := h.recTx.GetRecTransactionByID(c, userID, id)
 	if err != nil {
-		fmt.Println("h.recTx.GetRecTransactionByID error: %w", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		writeError(c, err)
 		return
 	}
 

@@ -111,6 +111,8 @@ type RecurringRepository interface {
 	GetRecTransactionByID(ctx context.Context, userID, id int) (*RecTransactionFull, error)
 	GetRecTransactionsList(ctx context.Context, userID int) ([]*RecTransactionFull, error)
 	GetDueRecurring(ctx context.Context) ([]*RecTransactionFull, error)
+	// LockDueRecurringTx блокирует расписание и сообщает, что оно всё ещё активно и подошёл срок.
+	LockDueRecurringTx(ctx context.Context, tx pgx.Tx, id int) (bool, error)
 	CreateRecTransaction(ctx context.Context, tx pgx.Tx, recTransaction *CreateRecTransaction) (int, error)
 	UpdateRecTransaction(ctx context.Context, recTransaction *UpdateRecTransaction) error
 	UpdateRecurringStatus(ctx context.Context, userID, id int, status string) error

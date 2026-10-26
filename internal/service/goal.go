@@ -1,8 +1,8 @@
-﻿package service
+package service
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"errors"
 	"fmt"
@@ -10,7 +10,7 @@ import (
 
 func (s *Service) CreateGoal(ctx context.Context, goal *domain.CreateGoal) error {
 	if goal.TargetAmount <= 0 {
-		return fmt.Errorf("target amount must be greater than zero")
+		return fmt.Errorf("%w: target amount must be greater than zero", errs.ErrInvalidInput)
 	}
 
 	_, err := s.goals.CreateGoal(ctx, goal)
@@ -57,7 +57,7 @@ func (s *Service) UpdateGoal(ctx context.Context, goal *domain.UpdateGoal) error
 	}
 
 	if goal.TargetAmount <= 0 {
-		return fmt.Errorf("target amount must be greater than zero")
+		return fmt.Errorf("%w: target amount must be greater than zero", errs.ErrInvalidInput)
 	}
 
 	if err := s.goals.UpdateGoal(ctx, goal); err != nil {
@@ -77,7 +77,7 @@ func (s *Service) UpdateGoalStatus(ctx context.Context, userID, id int, status s
 	switch status {
 	case domain.GoalStatusActive, domain.GoalStatusAchieved, domain.GoalStatusCancelled:
 	default:
-		return fmt.Errorf("invalid status: %s", status)
+		return fmt.Errorf("%w: invalid status %q", errs.ErrInvalidInput, status)
 	}
 
 	if err := s.goals.UpdateGoalStatus(ctx, userID, id, status); err != nil {
@@ -112,7 +112,7 @@ func (s *Service) GetContributions(ctx context.Context, userID, goalID int) ([]*
 
 func (s *Service) AddContribution(ctx context.Context, userID int, contribution *domain.CreateContribution) error {
 	if contribution.Amount <= 0 {
-		return fmt.Errorf("amount must be greater than zero")
+		return fmt.Errorf("%w: amount must be greater than zero", errs.ErrInvalidInput)
 	}
 
 	if _, err := s.goals.GetGoalByID(ctx, userID, contribution.GoalID); err != nil {

@@ -33,7 +33,7 @@ func (d Date) MarshalJSON() ([]byte, error) {
 	if d.Time.IsZero() {
 		return []byte("null"), nil
 	}
-	return json.Marshal(d.Time.Format(dateLayout))
+	return json.Marshal(d.Format(dateLayout))
 }
 
 func (d Date) IsZero() bool {

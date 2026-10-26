@@ -1,15 +1,32 @@
-﻿package service
+package service
 
 import (
 	"Project/internal/auth"
 	"Project/internal/domain"
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 )
 
 type txBeginner interface {
 	BeginTx(ctx context.Context) (pgx.Tx, error)
+}
+
+// finishTx завершает транзакцию по итоговой ошибке функции: rollback при ошибке или панике,
+// иначе commit. Вызывается через defer с указателем на именованный результат err.
+func finishTx(ctx context.Context, tx pgx.Tx, err *error) {
+	if p := recover(); p != nil {
+		_ = tx.Rollback(ctx)
+		panic(p)
+	}
+	if *err != nil {
+		_ = tx.Rollback(ctx)
+		return
+	}
+	if cerr := tx.Commit(ctx); cerr != nil {
+		*err = fmt.Errorf("commit tx: %w", cerr)
+	}
 }
 
 type Service struct {

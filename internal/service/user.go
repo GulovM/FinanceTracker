@@ -1,8 +1,8 @@
 package service
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"errors"
 	"fmt"
@@ -14,12 +14,13 @@ func (s *Service) RegisterUser(ctx context.Context, user *domain.UserRegister) e
 		return errs.ErrInvalidPassword
 	}
 
-	u, err := s.users.GetUserByEmail(ctx, user.Email)
-
-	if !errors.Is(err, errs.ErrNotFound) {
-		if u.IsDeleted {
-			return errs.ErrUserExist
-		}
+	_, err := s.users.GetUserByEmail(ctx, user.Email)
+	switch {
+	case err == nil:
+		// email занят: активным или удалённым (удалённый восстанавливается через RestoreUser)
+		return errs.ErrUserExist
+	case !errors.Is(err, errs.ErrNotFound):
+		return fmt.Errorf("s.users.GetUserByEmail error: %w", err)
 	}
 
 	hash, err := s.hasher.Hash(user.PasswordHash)
@@ -75,7 +76,7 @@ func (s *Service) GetUserByID(ctx context.Context, id int) (*domain.User, error)
 	userDB, err := s.users.GetUserByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return nil, fmt.Errorf("user not found")
+			return nil, errs.ErrNotFound
 		}
 		return nil, fmt.Errorf("s.users.GetUser error: %w", err)
 	}
@@ -84,6 +85,10 @@ func (s *Service) GetUserByID(ctx context.Context, id int) (*domain.User, error)
 
 // Обновление данных пользователя
 func (s *Service) UpdateUser(ctx context.Context, user *domain.UserProfile) error {
+	if len(user.PasswordHash) < 6 {
+		return errs.ErrInvalidPassword
+	}
+
 	u, err := s.users.GetUserByID(ctx, user.ID)
 
 	if err != nil {
@@ -135,13 +140,17 @@ func (s *Service) DeleteUser(ctx context.Context, id int) error {
 }
 
 func (s *Service) RestoreUser(ctx context.Context, user domain.UserLogin) error {
-	_, err := s.users.GetUserByEmail(ctx, user.Email)
-
+	u, err := s.users.GetUserByEmail(ctx, user.Email)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("user error: %w", err)
+			return errs.ErrInvalidCredentials
 		}
 		return fmt.Errorf("check user error: %w", err)
+	}
+
+	// без проверки пароля любой мог бы восстановить чужой удалённый аккаунт по email
+	if !s.hasher.Compare(u.PasswordHash, user.Password) {
+		return errs.ErrInvalidCredentials
 	}
 
 	err = s.users.RestoreUser(ctx, user)

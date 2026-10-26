@@ -8,22 +8,35 @@ import (
 	"Project/internal/repo"
 	"Project/internal/service"
 	"context"
+	"errors"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
-
-	"github.com/joho/godotenv"
 )
 
 func Run() {
 	log := logger.Init()
 
-	if err := godotenv.Load(".env", "internal/config/.env"); err != nil {
-		log.Warn().Err(err).Msg("ошибка в загрузке .env, будут использоваться текущие настройки окружения")
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		log.Error().Msg("JWT_SECRET не установлен")
+		return
 	}
 
 	conn, err := pgxdb.NewPostgresPgxConf()
 	if err != nil {
 		log.Fatal().Err(err).Msg("ошибка в инициализации соединения с postgres")
+	}
+	defer conn.Close()
+
+	migrateCtx, cancelMigrate := context.WithTimeout(context.Background(), time.Minute)
+	err = pgxdb.Migrate(migrateCtx, conn)
+	cancelMigrate()
+	if err != nil {
+		log.Error().Err(err).Msg("ошибка применения миграций")
+		return
 	}
 
 	r := repo.NewRepository(conn)
@@ -47,12 +60,6 @@ func Run() {
 		Hasher:       passwordHasher,
 	})
 
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		log.Error().Msg("JWT_SECRET не установлен")
-		return
-	}
-
 	jwtManager := auth.NewJWTManager(secret, 24*time.Hour)
 
 	handle := handler.NewHandler(handler.Deps{
@@ -71,13 +78,39 @@ func Run() {
 		JWTManager:   jwtManager,
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-	r2 := handle.InitRoutes()
 	srv.StartRecurringWorker(ctx)
-	log.Info().Msg("Запуск http сервера на порту :8080")
-	if err := r2.Run(":8080"); err != nil {
-		log.Err(err)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	httpSrv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           handle.InitRoutes(),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	serveErr := make(chan error, 1)
+	go func() {
+		log.Info().Msgf("Запуск http сервера на порту :%s", port)
+		serveErr <- httpSrv.ListenAndServe()
+	}()
+
+	select {
+	case err := <-serveErr:
+		if !errors.Is(err, http.ErrServerClosed) {
+			log.Error().Err(err).Msg("ошибка http сервера")
+		}
+	case <-ctx.Done():
+		log.Info().Msg("Получен сигнал завершения, останавливаю сервер")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		if err := httpSrv.Shutdown(shutdownCtx); err != nil {
+			log.Error().Err(err).Msg("ошибка при остановке http сервера")
+		}
 	}
 }

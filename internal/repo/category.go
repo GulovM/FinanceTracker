@@ -1,8 +1,8 @@
-﻿package repo
+package repo
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"errors"
 	"fmt"
@@ -43,6 +43,9 @@ func (r *Repository) GetCategories(ctx context.Context, userID int) ([]*domain.C
 		}
 		categories = append(categories, category.ToEntity())
 	}
+	if err := rows.Err(); err != nil {
+		return nil, scan_err(err)
+	}
 	return categories, nil
 }
 
@@ -79,6 +82,9 @@ func (r *Repository) GetSubcategories(ctx context.Context, id, userID int) ([]*d
 			return nil, scan_err(err)
 		}
 		subcategories = append(subcategories, subcategory.ToEntity())
+	}
+	if err := rows.Err(); err != nil {
+		return nil, scan_err(err)
 	}
 	return subcategories, nil
 }

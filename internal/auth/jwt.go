@@ -39,11 +39,8 @@ func (m *JWTManager) Generate(userID int) (string, error) {
 
 func (m *JWTManager) Parse(tokenStr string) (int, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
-		if t.Method != jwt.SigningMethodHS256 {
-			return nil, errs.ErrExpOrInvToken
-		}
 		return m.secretKey, nil
-	})
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithExpirationRequired())
 
 	if err != nil {
 		return 0, errs.ErrExpOrInvToken

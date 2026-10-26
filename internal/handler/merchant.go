@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"fmt"
 	"net/http"

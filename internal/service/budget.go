@@ -1,8 +1,8 @@
-﻿package service
+package service
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"errors"
 	"fmt"
@@ -10,10 +10,10 @@ import (
 
 func (s *Service) CreateBudget(ctx context.Context, budget *domain.CreateBudget) error {
 	if budget.AmountLimit <= 0 {
-		return fmt.Errorf("amount limit must be greater than zero")
+		return fmt.Errorf("%w: amount limit must be greater than zero", errs.ErrInvalidInput)
 	}
 	if budget.PeriodEnd.Before(budget.PeriodStart) {
-		return fmt.Errorf("period_end must be after period_start")
+		return fmt.Errorf("%w: period_end must be after period_start", errs.ErrInvalidInput)
 	}
 
 	_, err := s.budgets.CreateBudget(ctx, budget)
@@ -60,10 +60,10 @@ func (s *Service) UpdateBudget(ctx context.Context, budget *domain.UpdateBudget)
 	}
 
 	if budget.AmountLimit <= 0 {
-		return fmt.Errorf("amount limit must be greater than zero")
+		return fmt.Errorf("%w: amount limit must be greater than zero", errs.ErrInvalidInput)
 	}
 	if budget.PeriodEnd.Before(budget.PeriodStart) {
-		return fmt.Errorf("period_end must be after period_start")
+		return fmt.Errorf("%w: period_end must be after period_start", errs.ErrInvalidInput)
 	}
 
 	if err := s.budgets.UpdateBudget(ctx, budget); err != nil {

@@ -1,4 +1,4 @@
-﻿package repo
+package repo
 
 import (
 	"Project/internal/domain"
@@ -480,11 +480,11 @@ type dbRecTransaction struct {
 func (drt *dbRecTransaction) ToEntity() *domain.RecTransaction {
 	var dayOfMonth, dayOfWeek *int8
 	if drt.DayOfMonth.Valid {
-		i := int8(drt.DayOfMonth.Byte)
+		i := int8(drt.DayOfMonth.Byte) //nolint:gosec // день месяца 1..31 помещается в int8
 		dayOfMonth = &i
 	}
 	if drt.DayOfWeek.Valid {
-		i := int8(drt.DayOfWeek.Byte)
+		i := int8(drt.DayOfWeek.Byte) //nolint:gosec // день недели 1..7 помещается в int8
 		dayOfWeek = &i
 	}
 	return &domain.RecTransaction{
@@ -540,11 +540,11 @@ func (drtf *dbRecTransactionFull) ToEntity() *domain.RecTransactionFull {
 		merchantName, recipient, comment *string
 	)
 	if drtf.DayOfMonth.Valid {
-		i := int8(drtf.DayOfMonth.Byte)
+		i := int8(drtf.DayOfMonth.Byte) //nolint:gosec // день месяца 1..31 помещается в int8
 		dayOfMonth = &i
 	}
 	if drtf.DayOfWeek.Valid {
-		i := int8(drtf.DayOfWeek.Byte)
+		i := int8(drtf.DayOfWeek.Byte) //nolint:gosec // день недели 1..7 помещается в int8
 		dayOfWeek = &i
 	}
 	if drtf.UserName.Valid {

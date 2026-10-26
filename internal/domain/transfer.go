@@ -8,26 +8,26 @@ import (
 )
 
 type Transfer struct {
-	ID              int        `json:"id"`
-	UserID          int        `json:"user_id"`
-	UserName        string     `json:"user_name"`
-	FromAccountID   int        `json:"from_account_id"`
-	ToAccountID     int        `json:"to_account_id"`
-	FromAccountName string     `json:"acc_from_name"`
-	ToAccountName   string     `json:"acc_to_name"`
-	Amount          float64    `json:"amount"`
-	CreatedAt       time.Time  `json:"created_at"`
-	Comment         *string    `json:"comment"`
+	ID              int       `json:"id"`
+	UserID          int       `json:"user_id"`
+	UserName        string    `json:"user_name"`
+	FromAccountID   int       `json:"from_account_id"`
+	ToAccountID     int       `json:"to_account_id"`
+	FromAccountName string    `json:"acc_from_name"`
+	ToAccountName   string    `json:"acc_to_name"`
+	Amount          float64   `json:"amount"`
+	CreatedAt       time.Time `json:"created_at"`
+	Comment         *string   `json:"comment"`
 }
 
 type TransferFull struct {
-	ID              int        `json:"id"`
-	UserName        string     `json:"user_name"`
-	FromAccountName string     `json:"acc_from_name"`
-	ToAccountName   string     `json:"acc_to_name"`
-	Amount          float64    `json:"amount"`
-	CreatedAt       time.Time  `json:"created_at"`
-	Comment         *string    `json:"comment"`
+	ID              int       `json:"id"`
+	UserName        string    `json:"user_name"`
+	FromAccountName string    `json:"acc_from_name"`
+	ToAccountName   string    `json:"acc_to_name"`
+	Amount          float64   `json:"amount"`
+	CreatedAt       time.Time `json:"created_at"`
+	Comment         *string   `json:"comment"`
 }
 
 type CreateTransfer struct {

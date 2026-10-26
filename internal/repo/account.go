@@ -1,8 +1,8 @@
-﻿package repo
+package repo
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"errors"
 	"fmt"
@@ -73,10 +73,13 @@ func (r *Repository) TopupAccountTx(ctx context.Context, tx pgx.Tx, updateAccoun
         where user_id = $2 and id = $3 and is_deleted = false;
     `
 
-	_, err := tx.Exec(ctx, query, updateAccount.Balance, updateAccount.UserID, updateAccount.ID)
+	tag, err := tx.Exec(ctx, query, updateAccount.Balance, updateAccount.UserID, updateAccount.ID)
 
 	if err != nil {
 		return exec_err(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return errs.ErrNotFound
 	}
 
 	return nil
@@ -107,10 +110,13 @@ func (r *Repository) WithdrowAccountTx(ctx context.Context, tx pgx.Tx, updateAcc
         where user_id = $2 and id = $3 and is_deleted = false;
     `
 
-	_, err := tx.Exec(ctx, query, updateAccount.Balance, updateAccount.UserID, updateAccount.ID)
+	tag, err := tx.Exec(ctx, query, updateAccount.Balance, updateAccount.UserID, updateAccount.ID)
 
 	if err != nil {
 		return exec_err(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return errs.ErrNotFound
 	}
 
 	return nil
@@ -156,11 +162,14 @@ func (r *Repository) GetAccounts(ctx context.Context, userID int) ([]*domain.Acc
 		}
 		Accounts = append(Accounts, account.ToEntity())
 	}
+	if err := rows.Err(); err != nil {
+		return nil, scan_err(err)
+	}
 
 	return Accounts, nil
 }
 
-func (r *Repository) fetchAccount(ctx context.Context, runner RowGetter, userID, id int) (*domain.Account, error) {
+func (r *Repository) fetchAccount(ctx context.Context, runner RowGetter, userID, id int, forUpdate bool) (*domain.Account, error) {
 	query := `
     	select 
 			a.id,
@@ -176,8 +185,12 @@ func (r *Repository) fetchAccount(ctx context.Context, runner RowGetter, userID,
 		left join users u on a.user_id = u.id
 		left join wallet_type wt on a.wallet_type_id = wt.id 
 		left join card_type ct on a.card_type_id = ct.id
-		where a.id = $1 and a.user_id = $2 and a.is_deleted = false;
+		where a.id = $1 and a.user_id = $2 and a.is_deleted = false
     `
+	if forUpdate {
+		// блокируем строку счёта до конца транзакции, чтобы проверка баланса не гонялась с другими списаниями
+		query += " for update of a"
+	}
 
 	row := runner.QueryRow(ctx, query, id, userID)
 
@@ -196,11 +209,11 @@ func (r *Repository) fetchAccount(ctx context.Context, runner RowGetter, userID,
 }
 
 func (r *Repository) GetAccountByID(ctx context.Context, userID, id int) (*domain.Account, error) {
-	return r.fetchAccount(ctx, r.postgres, userID, id)
+	return r.fetchAccount(ctx, r.postgres, userID, id, false)
 }
 
 func (r *Repository) GetAccountByIDTx(ctx context.Context, tx pgx.Tx, userID, id int) (*domain.Account, error) {
-	return r.fetchAccount(ctx, tx, userID, id)
+	return r.fetchAccount(ctx, tx, userID, id, true)
 }
 
 func (r *Repository) DeleteAccount(ctx context.Context, userID, id int) error {

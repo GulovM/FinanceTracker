@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
 	"context"
 	"fmt"
@@ -43,8 +42,7 @@ func (h *Handler) CreateTransfer(c *gin.Context) {
 
 	err = h.transfers.CreateTransfer(c.Request.Context(), &transferCreate)
 	if err != nil {
-		fmt.Println("h.transfers.CreateTransfer error:", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": errs.ErrIntSrv})
+		writeError(c, err)
 		return
 	}
 
@@ -149,8 +147,7 @@ func (h *Handler) GetTranferByID(c *gin.Context) {
 
 	transfer, err := h.transfers.GetTranferByID(c.Request.Context(), userID, id)
 	if err != nil {
-		fmt.Println("h.transfers.GetTranferByID error:", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": errs.ErrIntSrv})
+		writeError(c, err)
 		return
 	}
 

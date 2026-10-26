@@ -10,7 +10,7 @@ type User struct {
 	FirstName    string     `json:"first_name"`
 	SecondName   string     `json:"second_name"`
 	Email        string     `json:"email"`
-	PasswordHash string     `json:"password_hash"`
+	PasswordHash string     `json:"-"`
 	CreatedAt    time.Time  `json:"created_at"`
 	IsDeleted    bool       `json:"is_deleted"`
 	DeletedAt    *time.Time `json:"deleted_at"`

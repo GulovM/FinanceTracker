@@ -10,4 +10,7 @@ var (
 	ErrInvalidCredentials = errors.New("invalid email or password")
 	ErrInvalidPassword    = errors.New("the password does not meet the requirements")
 	ErrUnauthorized       = errors.New("unauthorized user")
+	ErrInvalidInput       = errors.New("invalid input")
+	ErrInsufficientFunds  = errors.New("insufficient funds")
+	ErrForbidden          = errors.New("forbidden")
 )

@@ -1,12 +1,11 @@
 package service
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"errors"
 	"fmt"
-
 )
 
 // получение всех категорий
@@ -53,12 +52,12 @@ func (s *Service) UpdateMyCategory(ctx context.Context, updateCategory *domain.U
 	ctg, err := s.categories.GetCategoryByID(ctx, updateCategory.ID, updateCategory.UserID)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("category not found")
+			return fmt.Errorf("category %w", errs.ErrNotFound)
 		}
 		return fmt.Errorf("s.categories.GetMyCategoryByID: %w", err)
 	}
 	if ctg.UserID == nil {
-		return fmt.Errorf("global categories founded only")
+		return fmt.Errorf("%w: global categories can not be modified", errs.ErrForbidden)
 	}
 	err = s.categories.UpdateMyCategory(ctx, updateCategory)
 	if err != nil {
@@ -72,12 +71,12 @@ func (s *Service) UpdateMySubcategory(ctx context.Context, updateSubcategory *do
 	stg, err := s.categories.GetSubcategoryByID(ctx, updateSubcategory.ID, updateSubcategory.UserID)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("subcategory not found")
+			return fmt.Errorf("subcategory %w", errs.ErrNotFound)
 		}
 		return fmt.Errorf("s.categories.GetMySubcategoryByID: %w", err)
 	}
 	if stg.UserID == nil {
-		return fmt.Errorf("global subcategories founded only")
+		return fmt.Errorf("%w: global subcategories can not be modified", errs.ErrForbidden)
 	}
 	err = s.categories.UpdateMySubcategory(ctx, updateSubcategory)
 	if err != nil {
@@ -91,12 +90,12 @@ func (s *Service) DeleteMyCategory(ctx context.Context, id, userID int) error {
 	ctg, err := s.categories.GetCategoryByID(ctx, id, userID)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("category not found")
+			return fmt.Errorf("category %w", errs.ErrNotFound)
 		}
 		return fmt.Errorf("s.categories.GetMyCategoryByID: %w", err)
 	}
 	if ctg.UserID == nil {
-		return fmt.Errorf("global categories founded only")
+		return fmt.Errorf("%w: global categories can not be modified", errs.ErrForbidden)
 	}
 	err = s.categories.DeleteMyCategory(ctx, id, userID)
 	if err != nil {
@@ -110,12 +109,12 @@ func (s *Service) DeleteMySubcategory(ctx context.Context, id, userID int) error
 	stg, err := s.categories.GetSubcategoryByID(ctx, id, userID)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("subcategory not found")
+			return fmt.Errorf("subcategory %w", errs.ErrNotFound)
 		}
 		return fmt.Errorf("s.categories.GetMySubcategoryByID: %w", err)
 	}
 	if stg.UserID == nil {
-		return fmt.Errorf("global categories founded only")
+		return fmt.Errorf("%w: global categories can not be modified", errs.ErrForbidden)
 	}
 	err = s.categories.DeleteMySubcategory(ctx, id, userID)
 	if err != nil {

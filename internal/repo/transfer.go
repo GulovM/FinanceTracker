@@ -1,8 +1,8 @@
 package repo
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"errors"
 	"fmt"
@@ -132,6 +132,9 @@ func (r *Repository) GetTransfers(ctx context.Context, f domain.TransfersFilter)
 			return nil, scan_err(err)
 		}
 		transfers = append(transfers, tr.ToEntity())
+	}
+	if err := rows.Err(); err != nil {
+		return nil, scan_err(err)
 	}
 
 	return transfers, nil

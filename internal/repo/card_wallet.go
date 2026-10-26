@@ -1,4 +1,4 @@
-﻿package repo
+package repo
 
 import (
 	"Project/internal/domain"
@@ -28,6 +28,9 @@ func (r *Repository) GetCardTypes(ctx context.Context) ([]*domain.CardTypes, err
 		}
 		cardTypes = append(cardTypes, cardType.ToEntity())
 	}
+	if err := rows.Err(); err != nil {
+		return nil, scan_err(err)
+	}
 
 	return cardTypes, nil
 }
@@ -51,6 +54,9 @@ func (r *Repository) GetWalletTypes(ctx context.Context) ([]*domain.WalletTypes,
 			return nil, scan_err(err)
 		}
 		walletTypes = append(walletTypes, walletType.ToEntity())
+	}
+	if err := rows.Err(); err != nil {
+		return nil, scan_err(err)
 	}
 
 	return walletTypes, nil

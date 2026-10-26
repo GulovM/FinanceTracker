@@ -1,8 +1,8 @@
-﻿package repo
+package repo
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"errors"
 
@@ -62,6 +62,9 @@ func (r *Repository) GetGoals(ctx context.Context, userID int) ([]*domain.Saving
 			return nil, scan_err(err)
 		}
 		goals = append(goals, g.ToEntity())
+	}
+	if err := rows.Err(); err != nil {
+		return nil, scan_err(err)
 	}
 	return goals, nil
 }
@@ -165,6 +168,9 @@ func (r *Repository) GetContributions(ctx context.Context, goalID int) ([]*domai
 			return nil, scan_err(err)
 		}
 		contributions = append(contributions, c.ToEntity())
+	}
+	if err := rows.Err(); err != nil {
+		return nil, scan_err(err)
 	}
 	return contributions, nil
 }

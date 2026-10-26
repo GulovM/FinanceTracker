@@ -84,11 +84,18 @@ const (
 	TransactionTypeTransfer = "Перевод"
 )
 
+// TransferCategoryID — идентификатор системной категории «Перевод»,
+// в которую попадают транзакции, созданные переводом между счетами.
+const TransferCategoryID = 13
+
 type TransactionRepository interface {
 	GetTransactions(ctx context.Context, filter *TransactionsFilter) ([]*Transactions, error)
 	GetTransactionByID(ctx context.Context, userID, id int) (*Transactions, error)
+	GetTransactionByIDTx(ctx context.Context, tx pgx.Tx, userID, id int) (*Transactions, error)
 	CreateTransaction(ctx context.Context, createTransaction *CreateTransaction) (int, error)
 	CreateTransactionTx(ctx context.Context, tx pgx.Tx, createTransaction *CreateTransaction) (int, error)
 	UpdateTransaction(ctx context.Context, updateTransaction *UpdateTransaction) error
+	UpdateTransactionTx(ctx context.Context, tx pgx.Tx, updateTransaction *UpdateTransaction) error
 	DeleteTransaction(ctx context.Context, id, userID int) error
+	DeleteTransactionTx(ctx context.Context, tx pgx.Tx, id, userID int) error
 }

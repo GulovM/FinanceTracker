@@ -2,6 +2,7 @@ package repo
 
 import (
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"errors"
 	"fmt"
@@ -38,6 +39,7 @@ func (r *Repository) GetRecTransactions(ctx context.Context, userID int) ([]*dom
 		}
 		return nil, fmt.Errorf("query error: %w", err)
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		tr, err := pgx.RowToStructByName[dbRecTransaction](rows)
@@ -45,6 +47,9 @@ func (r *Repository) GetRecTransactions(ctx context.Context, userID int) ([]*dom
 			return nil, scan_err(err)
 		}
 		rec_transactions = append(rec_transactions, tr.ToEntity())
+	}
+	if err := rows.Err(); err != nil {
+		return nil, scan_err(err)
 	}
 	return rec_transactions, nil
 }
@@ -63,7 +68,7 @@ func (r *Repository) GetRecTransactionByID(ctx context.Context, userID, id int) 
 			s.name subcategory_name,
 			rt.merchant_id,
 			m.name merchant_name,
-			COALESCE(array_agg(g.name) FILTER (WHERE g.id IS NOT NULL), '{}') AS tags,
+			COALESCE(array_agg(DISTINCT g.name) FILTER (WHERE g.id IS NOT NULL), '{}') AS tags,
 			rt.type rec_transac_type,
 			rt.amount,
 			rt.recipient,
@@ -105,7 +110,7 @@ func (r *Repository) GetRecTransactionByID(ctx context.Context, userID, id int) 
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return dbRecTransaction.ToEntity(), nil
+			return nil, errs.ErrNotFound
 		}
 		return nil, scan_err(err)
 	}
@@ -176,6 +181,9 @@ func (r *Repository) GetRecTransactionsList(ctx context.Context, userID int) ([]
 		}
 		rec_transactions = append(rec_transactions, tr.ToEntity())
 	}
+	if err := rows.Err(); err != nil {
+		return nil, scan_err(err)
+	}
 	return rec_transactions, nil
 }
 
@@ -193,8 +201,8 @@ func (r *Repository) GetDueRecurring(ctx context.Context) ([]*domain.RecTransact
 			s.name subcategory_name,
 			rt.merchant_id,
 			m.name merchant_name,
-			COALESCE(array_agg(g.id) FILTER (WHERE g.id IS NOT NULL), '{}') AS tag_ids,
-			COALESCE(array_agg(g.name) FILTER (WHERE g.id IS NOT NULL), '{}') AS tags,
+			COALESCE(array_agg(DISTINCT g.id) FILTER (WHERE g.id IS NOT NULL), '{}') AS tag_ids,
+			COALESCE(array_agg(DISTINCT g.name) FILTER (WHERE g.id IS NOT NULL), '{}') AS tags,
 			rt.type rec_transac_type,
 			rt.amount,
 			rt.recipient,
@@ -232,6 +240,7 @@ func (r *Repository) GetDueRecurring(ctx context.Context) ([]*domain.RecTransact
 		}
 		return nil, fmt.Errorf("query error: %w", err)
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		tr, err := pgx.RowToStructByName[dbRecTransactionFull](rows)
@@ -240,7 +249,27 @@ func (r *Repository) GetDueRecurring(ctx context.Context) ([]*domain.RecTransact
 		}
 		rec_transactions = append(rec_transactions, tr.ToEntity())
 	}
+	if err := rows.Err(); err != nil {
+		return nil, scan_err(err)
+	}
 	return rec_transactions, nil
+}
+
+func (r *Repository) LockDueRecurringTx(ctx context.Context, tx pgx.Tx, id int) (bool, error) {
+	query := `
+		select 1 from recurring_transaction
+		where id = $1 and status = 'Активен' and next_run_at <= now()
+		for update skip locked;
+	`
+
+	var one int
+	if err := tx.QueryRow(ctx, query, id).Scan(&one); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		return false, scan_err(err)
+	}
+	return true, nil
 }
 
 func (r *Repository) CreateRecTransaction(ctx context.Context, tx pgx.Tx, recTransaction *domain.CreateRecTransaction) (int, error) {

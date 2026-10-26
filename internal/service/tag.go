@@ -1,8 +1,8 @@
 package service
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"errors"
 	"fmt"
@@ -25,7 +25,7 @@ func (s *Service) GetTags(ctx context.Context, userID int) ([]*domain.Tag, error
 
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return nil, fmt.Errorf("no rows select")
+			return []*domain.Tag{}, nil
 		}
 		return nil, fmt.Errorf("s.tags.GetTags error: %w", err)
 	}
@@ -38,7 +38,7 @@ func (s *Service) UpdateTag(ctx context.Context, tag *domain.UpdateTag) error {
 	_, err := s.tags.GetTagByID(ctx, tag.ID, tag.UserID)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("a tag with this ID does not exist")
+			return fmt.Errorf("tag %w", errs.ErrNotFound)
 		}
 		return fmt.Errorf("s.tags.GetTagByID error: %w", err)
 	}
@@ -56,7 +56,7 @@ func (s *Service) DeleteTag(ctx context.Context, tagID, userID int) error {
 	_, err := s.tags.GetTagByID(ctx, tagID, userID)
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("a tag with this ID does not exist")
+			return fmt.Errorf("tag %w", errs.ErrNotFound)
 		}
 		return fmt.Errorf("s.tags.GetTagByID error: %w", err)
 	}

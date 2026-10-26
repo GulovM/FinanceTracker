@@ -38,26 +38,20 @@ func (s *Service) GetTransactions(ctx context.Context, userID int, filter *domai
 	return transactions, nil
 }
 
-func (s *Service) CreateTransaction(ctx context.Context, createTransaction *domain.CreateTransaction) (int, error) {
+func (s *Service) CreateTransaction(ctx context.Context, createTransaction *domain.CreateTransaction) (txID int, err error) {
 	if createTransaction == nil {
-		return 0, fmt.Errorf("transaction payload is required")
+		return 0, fmt.Errorf("%w: transaction payload is required", errs.ErrInvalidInput)
 	}
 
 	if createTransaction.Amount <= 0 {
-		return 0, fmt.Errorf("amount must be greater than zero")
+		return 0, fmt.Errorf("%w: amount must be greater than zero", errs.ErrInvalidInput)
 	}
 
 	tx, err := s.tx.BeginTx(ctx)
 	if err != nil {
 		return 0, err
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		} else {
-			_ = tx.Commit(ctx)
-		}
-	}()
+	defer finishTx(ctx, tx, &err)
 
 	acc, err := s.accounts.GetAccountByIDTx(ctx, tx, createTransaction.UserID, createTransaction.AccountID)
 	if err != nil {
@@ -96,10 +90,9 @@ func (s *Service) CreateTransaction(ctx context.Context, createTransaction *doma
 	createTransaction.Type = ctg.Type
 
 	if createTransaction.Type == domain.TransactionTypeExpense && acc.Balance < createTransaction.Amount {
-		return 0, fmt.Errorf("insufficient balance")
+		return 0, errs.ErrInsufficientFunds
 	}
 
-	var txID int
 	if txID, err = s.transactions.CreateTransactionTx(ctx, tx, createTransaction); err != nil {
 		return 0, fmt.Errorf("s.transactions.CreateTransaction error: %w", err)
 	}
@@ -130,11 +123,11 @@ func (s *Service) CreateTransaction(ctx context.Context, createTransaction *doma
 
 func (s *Service) CreateTransactionTx(ctx context.Context, tx pgx.Tx, createTransaction *domain.CreateTransaction) error {
 	if createTransaction == nil {
-		return fmt.Errorf("transaction payload is required")
+		return fmt.Errorf("%w: transaction payload is required", errs.ErrInvalidInput)
 	}
 
 	if createTransaction.Amount <= 0 {
-		return fmt.Errorf("amount must be greater than zero")
+		return fmt.Errorf("%w: amount must be greater than zero", errs.ErrInvalidInput)
 	}
 
 	acc, err := s.accounts.GetAccountByIDTx(ctx, tx, createTransaction.UserID, createTransaction.AccountID)
@@ -174,7 +167,7 @@ func (s *Service) CreateTransactionTx(ctx context.Context, tx pgx.Tx, createTran
 	createTransaction.Type = ctg.Type
 
 	if createTransaction.Type == domain.TransactionTypeExpense && acc.Balance < createTransaction.Amount {
-		return fmt.Errorf("insufficient balance")
+		return errs.ErrInsufficientFunds
 	}
 
 	if _, err = s.transactions.CreateTransactionTx(ctx, tx, createTransaction); err != nil {
@@ -205,32 +198,26 @@ func (s *Service) CreateTransactionTx(ctx context.Context, tx pgx.Tx, createTran
 	return nil
 }
 
-func (s *Service) UpdateTransaction(ctx context.Context, updateTransaction *domain.UpdateTransaction) error {
+func (s *Service) UpdateTransaction(ctx context.Context, updateTransaction *domain.UpdateTransaction) (err error) {
 	if updateTransaction == nil {
-		return fmt.Errorf("transaction payload is required")
+		return fmt.Errorf("%w: transaction payload is required", errs.ErrInvalidInput)
 	}
 
 	if updateTransaction.Amount <= 0 {
-		return fmt.Errorf("amount must be greater than zero")
+		return fmt.Errorf("%w: amount must be greater than zero", errs.ErrInvalidInput)
 	}
 
 	tx, err := s.tx.BeginTx(ctx)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		} else {
-			_ = tx.Commit(ctx)
-		}
-	}()
+	defer finishTx(ctx, tx, &err)
 
-	trn, err := s.transactions.GetTransactionByID(ctx, updateTransaction.UserID, updateTransaction.ID)
+	trn, err := s.transactions.GetTransactionByIDTx(ctx, tx, updateTransaction.UserID, updateTransaction.ID)
 
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("transaction whith this ID not found: %w", err)
+			return fmt.Errorf("transaction with this ID not found: %w", err)
 		}
 		return fmt.Errorf("s.transactions.GetTransactionByID error: %w", err)
 	}
@@ -251,7 +238,7 @@ func (s *Service) UpdateTransaction(ctx context.Context, updateTransaction *doma
 	}
 
 	if ctg.Type == domain.TransactionTypeTransfer || trn.Type == domain.TransactionTypeTransfer || trn.TransferID != nil {
-		return fmt.Errorf("can not update transfer")
+		return fmt.Errorf("%w: can not update transfer", errs.ErrInvalidInput)
 	}
 
 	if updateTransaction.SubcategoryID != nil {
@@ -281,16 +268,16 @@ func (s *Service) UpdateTransaction(ctx context.Context, updateTransaction *doma
 	}
 	switch trn.Type {
 	case domain.TransactionTypeIncome:
-		if trn.CategoryID != 13 {
+		if trn.CategoryID != domain.TransferCategoryID {
 			err = s.accounts.WithdrowAccountTx(ctx, tx, &updateAccount)
 		} else {
-			err = fmt.Errorf("can not update transfer")
+			err = fmt.Errorf("%w: can not update transfer", errs.ErrInvalidInput)
 		}
 	case domain.TransactionTypeExpense:
-		if trn.CategoryID != 13 {
+		if trn.CategoryID != domain.TransferCategoryID {
 			err = s.accounts.TopupAccountTx(ctx, tx, &updateAccount)
 		} else {
-			err = fmt.Errorf("can not update transfer")
+			err = fmt.Errorf("%w: can not update transfer", errs.ErrInvalidInput)
 		}
 	default:
 		err = fmt.Errorf("unsupported transaction type: %s", trn.Type)
@@ -308,10 +295,10 @@ func (s *Service) UpdateTransaction(ctx context.Context, updateTransaction *doma
 		return fmt.Errorf("s.accounts.GetAccountByIDTx error: %w", err)
 	}
 	if updateTransaction.Type == domain.TransactionTypeExpense && acc.Balance < updateTransaction.Amount {
-		return fmt.Errorf("insufficient balance")
+		return errs.ErrInsufficientFunds
 	}
 
-	err = s.transactions.UpdateTransaction(ctx, updateTransaction)
+	err = s.transactions.UpdateTransactionTx(ctx, tx, updateTransaction)
 	if err != nil {
 		return fmt.Errorf("s.transactions.UpdateTransaction error: %w", err)
 	}
@@ -335,29 +322,27 @@ func (s *Service) UpdateTransaction(ctx context.Context, updateTransaction *doma
 	return nil
 }
 
-func (s *Service) DeleteTransaction(ctx context.Context, id, userID int) error {
+func (s *Service) DeleteTransaction(ctx context.Context, id, userID int) (err error) {
 	tx, err := s.tx.BeginTx(ctx)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		} else {
-			_ = tx.Commit(ctx)
-		}
-	}()
+	defer finishTx(ctx, tx, &err)
 
-	trn, err := s.transactions.GetTransactionByID(ctx, userID, id)
+	trn, err := s.transactions.GetTransactionByIDTx(ctx, tx, userID, id)
 
 	if err != nil {
 		if errors.Is(err, errs.ErrNotFound) {
-			return fmt.Errorf("transaction whith this ID not found: %w", err)
+			return fmt.Errorf("transaction with this ID not found: %w", err)
 		}
 		return fmt.Errorf("s.transactions.GetTransactionByID error: %w", err)
 	}
 
-	err = s.transactions.DeleteTransaction(ctx, id, userID)
+	if trn.Type == domain.TransactionTypeTransfer || trn.TransferID != nil {
+		return fmt.Errorf("%w: can not delete transfer transaction", errs.ErrInvalidInput)
+	}
+
+	err = s.transactions.DeleteTransactionTx(ctx, tx, id, userID)
 	if err != nil {
 		return fmt.Errorf("s.transactions.DeleteTransaction error: %w", err)
 	}

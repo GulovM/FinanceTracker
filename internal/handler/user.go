@@ -1,8 +1,8 @@
-﻿package handler
+package handler
 
 import (
-	"Project/internal/errs"
 	"Project/internal/domain"
+	"Project/internal/errs"
 	"context"
 	"fmt"
 	"net/http"
@@ -25,7 +25,7 @@ func (h *Handler) RegisterUser(c *gin.Context) {
 	err := c.BindJSON(&request)
 	if err != nil {
 		fmt.Println("bind error:", err)
-		c.JSON(400, gin.H{"error": err})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
@@ -36,8 +36,7 @@ func (h *Handler) RegisterUser(c *gin.Context) {
 		PasswordHash: request.PasswordHash,
 	})
 	if err != nil {
-		fmt.Printf("\nh.users.RegisterUser error: %v", err)
-		c.JSON(500, gin.H{"error": errs.ErrIntSrv.Error()})
+		writeError(c, err)
 		return
 	}
 

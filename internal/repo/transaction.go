@@ -1,4 +1,4 @@
-﻿package repo
+package repo
 
 import (
 	"Project/internal/domain"
@@ -127,10 +127,21 @@ func (r *Repository) GetTransactions(ctx context.Context, f *domain.Transactions
 		}
 		transactions = append(transactions, transaction.ToEntity())
 	}
+	if err := rows.Err(); err != nil {
+		return nil, scan_err(err)
+	}
 	return transactions, nil
 }
 
 func (r *Repository) GetTransactionByID(ctx context.Context, userID, id int) (*domain.Transactions, error) {
+	return r.fetchTransaction(ctx, r.postgres, userID, id)
+}
+
+func (r *Repository) GetTransactionByIDTx(ctx context.Context, tx pgx.Tx, userID, id int) (*domain.Transactions, error) {
+	return r.fetchTransaction(ctx, tx, userID, id)
+}
+
+func (r *Repository) fetchTransaction(ctx context.Context, runner RowGetter, userID, id int) (*domain.Transactions, error) {
 	query := `
 	select 
 		t.id,
@@ -169,7 +180,7 @@ func (r *Repository) GetTransactionByID(ctx context.Context, userID, id int) (*d
 	ORDER BY created_at DESC;
 	`
 
-	row := r.postgres.QueryRow(ctx, query, userID, id)
+	row := runner.QueryRow(ctx, query, userID, id)
 
 	var transaction dbTransaction
 	err := row.Scan(&transaction.ID, &transaction.UserID, &transaction.UserName, &transaction.AccountID, &transaction.AccountName, &transaction.CategoryID,
@@ -240,22 +251,29 @@ func (r *Repository) CreateTransactionTx(ctx context.Context, tx pgx.Tx, createT
 	return r.createTransaction(ctx, tx, createTransaction)
 }
 
-func (r *Repository) UpdateTransaction(ctx context.Context, updateTransaction *domain.UpdateTransaction) error {
+func (r *Repository) UpdateTransaction(ctx context.Context, updateTransaction *domain.UpdateTransaction) (err error) {
 	tx, err := r.postgres.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("tx begin error: %w", err)
 	}
 	defer func() {
 		if err != nil {
-			tx.Rollback(ctx)
-		} else {
-			commitErr := tx.Commit(ctx)
-			if commitErr != nil {
-				err = fmt.Errorf("tx commit error: %w", commitErr)
-			}
+			_ = tx.Rollback(ctx)
+			return
+		}
+		if commitErr := tx.Commit(ctx); commitErr != nil {
+			err = fmt.Errorf("tx commit error: %w", commitErr)
 		}
 	}()
 
+	return r.updateTransaction(ctx, tx, updateTransaction)
+}
+
+func (r *Repository) UpdateTransactionTx(ctx context.Context, tx pgx.Tx, updateTransaction *domain.UpdateTransaction) error {
+	return r.updateTransaction(ctx, tx, updateTransaction)
+}
+
+func (r *Repository) updateTransaction(ctx context.Context, tx RowGetter, updateTransaction *domain.UpdateTransaction) error {
 	query1 := `
 	update transactions set 
 	account_id = $1,
@@ -272,7 +290,7 @@ func (r *Repository) UpdateTransaction(ctx context.Context, updateTransaction *d
 	where id = $11 and user_id = $12;
 	`
 
-	_, err = tx.Exec(ctx, query1, updateTransaction.AccountID, updateTransaction.CategoryID, updateTransaction.SubcategoryID,
+	_, err := tx.Exec(ctx, query1, updateTransaction.AccountID, updateTransaction.CategoryID, updateTransaction.SubcategoryID,
 		updateTransaction.MerchantID, updateTransaction.Type, updateTransaction.Amount, updateTransaction.Recipient,
 		updateTransaction.Comment, updateTransaction.RecurringID, updateTransaction.TransferID, updateTransaction.ID, updateTransaction.UserID)
 
@@ -299,14 +317,22 @@ func (r *Repository) UpdateTransaction(ctx context.Context, updateTransaction *d
 }
 
 func (r *Repository) DeleteTransaction(ctx context.Context, id, userID int) error {
+	return r.deleteTransaction(ctx, r.postgres, id, userID)
+}
+
+func (r *Repository) DeleteTransactionTx(ctx context.Context, tx pgx.Tx, id, userID int) error {
+	return r.deleteTransaction(ctx, tx, id, userID)
+}
+
+func (r *Repository) deleteTransaction(ctx context.Context, runner RowGetter, id, userID int) error {
 	query := `
 	update transactions set
 	is_deleted = true,
 	deleted_at = now()
-	where id = $1 and user_id = $2;
+	where id = $1 and user_id = $2 and is_deleted = false;
 	`
 
-	_, err := r.postgres.Exec(ctx, query, id, userID)
+	_, err := runner.Exec(ctx, query, id, userID)
 
 	if err != nil {
 		return exec_err(err)

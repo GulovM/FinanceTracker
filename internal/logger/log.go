@@ -32,13 +32,13 @@ func Init() zerolog.Logger {
 }
 
 func newLogger() zerolog.Logger {
-	if err := os.MkdirAll(logDir, 0o755); err != nil {
+	if err := os.MkdirAll(logDir, 0o750); err != nil {
 		fmt.Fprintf(os.Stderr, "logger setup fallback (mkdir failed): %v\n", err)
 		return zerolog.New(os.Stdout).With().Timestamp().Logger()
 	}
 
 	path := filepath.Join(logDir, logFile)
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600) //nolint:gosec // путь собирается из констант
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "logger setup fallback (open failed): %v\n", err)
 		return zerolog.New(os.Stdout).With().Timestamp().Logger()

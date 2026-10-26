@@ -1,4 +1,4 @@
-﻿package handler
+package handler
 
 import (
 	"Project/internal/auth"
@@ -31,7 +31,7 @@ func AuthMiddleware(jwtManager *auth.JWTManager) gin.HandlerFunc {
 			return
 		}
 
-		c.Set("user_id", int(userID))
+		c.Set("user_id", userID)
 
 		c.Next()
 	}
