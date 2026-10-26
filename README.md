@@ -40,8 +40,14 @@ Full-stack приложение для учёта личных финансов.
 │   └── service/             # бизнес-правила и фоновые задачи
 ├── app/                     # React-клиент
 │   ├── src/pages/           # страницы приложения
-│   ├── src/components/      # компоненты и layout
+│   ├── src/components/      # компоненты и layout (ui/ — shadcn/ui)
+│   ├── src/hooks/           # useAuth и вспомогательные хуки
+│   ├── src/providers/       # провайдер TanStack Query
 │   └── src/lib/api.ts       # клиент REST API
+├── k8s/                     # манифесты Kubernetes (Deployment, ServiceAccount/RBAC)
+├── .github/workflows/       # CI/CD (GitHub Actions)
+├── dockerfile               # сборка единого образа: Nginx + SPA + Go API
+├── docker-compose.yaml      # приложение + PostgreSQL для локального запуска
 ├── go.mod
 └── README.md
 ```
@@ -49,8 +55,25 @@ Full-stack приложение для учёта личных финансов.
 ## Требования
 
 - Go версии, указанной в [go.mod](go.mod) (сейчас `1.25.1`);
-- PostgreSQL 15+ и утилита `psql`;
-- Node.js 20+ и npm.
+- PostgreSQL 15+ (в docker-compose используется 16);
+- Node.js 20+ и npm (в Docker-образе — Node 22);
+- Docker и Docker Compose — только для контейнерного запуска.
+
+## Конфигурация backend
+
+Backend читает настройки **только из переменных окружения**: файл `.env` приложением не загружается. При локальном запуске задайте переменные в оболочке, а в Docker Compose их подставляет `env_file`. Шаблон — [internal/config/.env.example](internal/config/.env.example).
+
+| Переменная | Обязательна | Назначение |
+| --- | --- | --- |
+| `JWT_SECRET` | да | Секрет подписи JWT. Без него приложение завершается сразу после старта |
+| `POSTGRES_USER` (или `DB_USER`) | да | Пользователь PostgreSQL |
+| `POSTGRES_PASSWORD` (или `DB_PASSWORD`) | да | Пароль PostgreSQL |
+| `DB_HOST` | да | Адрес БД вместе с портом, например `localhost:5432` или `db:5432` |
+| `POSTGRES_DB` (или `DB_NAME`) | да | Имя базы данных |
+| `PORT` | нет | Порт API, по умолчанию `8080` |
+| `CORS_ALLOWED_ORIGIN` | нет | Значение `Access-Control-Allow-Origin`, по умолчанию `*`. В продакшене задайте конкретный origin |
+
+Не добавляйте реальные секреты в Git.
 
 ## Быстрый запуск
 
@@ -63,50 +86,24 @@ CREATE USER finance_user WITH PASSWORD 'change_me';
 CREATE DATABASE finance_tracker OWNER finance_user;
 ```
 
-В PowerShell примените SQL-файлы строго в хронологическом порядке:
+Применять миграции вручную не нужно: SQL-файлы из `internal/db/migrations` встроены в бинарник и накатываются через [goose](https://github.com/pressly/goose) при каждом старте API (таймаут — 1 минута). Они создают таблицы пользователей, счетов, операций, переводов, категорий, бюджетов, целей, регулярных операций и журнала событий, а также добавляют начальные типы карт, кошельков, категорий и подкатегорий. Новая миграция добавляется файлом в формате goose с более поздней временной меткой в имени.
+
+### 2. Запустить backend
+
+В PowerShell из корня репозитория:
 
 ```powershell
-$env:PGPASSWORD = 'change_me'
-Get-ChildItem .\internal\db\migrations\*.sql |
-  Sort-Object Name |
-  ForEach-Object { psql -v ON_ERROR_STOP=1 -h localhost -U finance_user -d finance_tracker -f $_.FullName }
-```
-
-Миграции создают таблицы пользователей, счетов, операций, переводов, категорий, бюджетов, целей, регулярных операций и журнала событий, а также добавляют начальные типы карт, кошельков, категорий и подкатегорий.
-
-### 2. Настроить backend
-
-Создайте файл `internal/config/.env`:
-
-```dotenv
-POSTGRES_USER=finance_user
-POSTGRES_PASSWORD=change_me
-DB_HOST=localhost:5432
-POSTGRES_DB=finance_tracker
-JWT_SECRET=replace-with-a-long-random-secret
-```
-
-`DB_HOST` может содержать порт. Не добавляйте реальные секреты в Git.
-
-Запустите API из корня репозитория:
-
-```powershell
+$env:POSTGRES_USER = 'finance_user'
+$env:POSTGRES_PASSWORD = 'change_me'
+$env:DB_HOST = 'localhost:5432'
+$env:POSTGRES_DB = 'finance_tracker'
+$env:JWT_SECRET = 'replace-with-a-long-random-secret'
 go run ./cmd/api
 ```
 
-Сервер будет доступен по адресу `http://localhost:8080`.
+Сервер будет доступен по адресу `http://localhost:8080`. При получении `SIGINT`/`SIGTERM` он корректно завершается (до 15 секунд на закрытие соединений).
 
-> Текущая версия backend пытается загрузить `.env` по абсолютному Windows-пути `D:\Desktop\Project\internal\config\.env`. Если репозиторий расположен в другом месте, перед запуском задайте переменные окружения в оболочке либо сделайте путь в `internal/app/app.go` относительным.
-
-### 3. Настроить и запустить frontend
-
-Создайте `app/.env.local`:
-
-```dotenv
-VITE_API_BASE_URL=http://localhost:8080
-```
-
-Затем в отдельном терминале:
+### 3. Запустить frontend
 
 ```powershell
 Set-Location app
@@ -114,17 +111,55 @@ npm ci
 npm run dev
 ```
 
-Vite выведет адрес локального интерфейса — обычно `http://localhost:5173`. Параметр `VITE_API_BASE_URL` обязателен для разработки: без него клиент обращается к относительному пути `/api`.
+Dev-сервер Vite слушает `http://localhost:3000` и проксирует запросы `/api/*` на `http://localhost:8080`, отрезая префикс `/api`. Поэтому для разработки ничего настраивать не нужно. Если API находится по другому адресу, создайте `app/.env.local` с `VITE_API_BASE_URL=http://host:port` (шаблон — [app/.env.example](app/.env.example)); тогда клиент обращается к нему напрямую, и на backend должен быть разрешён CORS для origin фронтенда. Пустое значение означает использование `/api`.
+
+JWT хранится в `localStorage` под ключом `auth_token`.
+
+## Запуск в Docker
+
+Корневой [dockerfile](dockerfile) собирает один образ из трёх этапов: сборка SPA (Node 22), сборка статического Go-бинарника и финальный Alpine с Nginx. Внутри контейнера Nginx на порту 80 отдаёт SPA (с fallback на `index.html`) и проксирует `/api/` на Go API по адресу `127.0.0.1:8080`. Скрипт-обёртка запускает оба сервиса и завершает их по `SIGTERM`/`SIGINT`.
+
+Локально приложение вместе с PostgreSQL запускается через Compose:
+
+```powershell
+Copy-Item internal\config\.env.example internal\config\.env
+# в internal\config\.env замените DB_HOST на db:5432, пароль и JWT_SECRET
+docker compose up --build
+```
+
+Интерфейс будет доступен на `http://localhost:8080` (порт 8080 хоста отображается на порт 80 контейнера), API — по пути `/api/`. Данные PostgreSQL хранятся в `./var/postgres` (каталог исключён из образа через `.dockerignore`).
+
+> Healthcheck БД в [docker-compose.yaml](docker-compose.yaml) жёстко задаёт пользователя `finance_user` и базу `finance_tracker`. Если вы меняете эти значения в `.env`, поправьте и healthcheck.
+
+## CI/CD и Kubernetes
+
+Workflow [.github/workflows/ci.yml](.github/workflows/ci.yml) запускается при push в `main` и состоит из трёх последовательных задач:
+
+1. **test** — `go fmt ./...` и `go vet ./...` (Go `1.25.1`). Тесты не запускаются, их в репозитории пока нет.
+2. **build** — сборка Docker-образа и публикация в GitHub Container Registry `ghcr.io/<owner>/<repo>` с тегами `latest` и `sha-<полный commit SHA>`.
+3. **deploy** — выполняется на self-hosted runner с PowerShell: настраивает `kubectl` через ServiceAccount, применяет [k8s/deployment/deployment.yml](k8s/deployment/deployment.yml), выставляет образ `sha-<commit>` в `deployment/my-app` (namespace `production`) и ждёт завершения раскатки до 120 секунд.
+
+Для деплоя в настройках репозитория нужны секреты `K8S_SERVER_URL` и `K8S_SECRET_YAML`. ServiceAccount `github-deployer`, роль и токен создаются один раз вручную: `kubectl apply -f k8s/serviceAccount/scaccount.yml`.
+
+Ограничения текущего манифеста:
+
+- `deployment.yml` не передаёт контейнеру переменные окружения (`JWT_SECRET`, параметры БД), поэтому без их добавления (например, через `Secret`) pod не запустится;
+- манифест не содержит `Service`/`Ingress` и PostgreSQL — их нужно развернуть отдельно;
+- образ в манифесте указан с фиксированным тегом; актуальный тег выставляет шаг `kubectl set image`.
 
 ## Проверка качества
 
 Backend:
 
 ```powershell
+go fmt ./...
+go vet ./...
 go test ./...
 ```
 
-Frontend:
+Автотестов на Go пока нет, поэтому `go test` лишь проверяет компиляцию пакетов; в CI выполняются `go fmt` и `go vet`.
+
+Frontend (тестов пока нет, `npm run test` запускается с `--passWithNoTests`):
 
 ```powershell
 Set-Location app
@@ -136,7 +171,7 @@ npm run build
 
 ## API
 
-API использует JSON и запущено без префикса версии. Все маршруты, кроме перечисленных в разделе «Публичные», требуют заголовок:
+API использует JSON и запущено без префикса версии (за Nginx в Docker-образе и через dev-прокси Vite оно доступно под префиксом `/api`). Все маршруты, кроме перечисленных в разделе «Публичные», требуют заголовок:
 
 ```http
 Authorization: Bearer <JWT>

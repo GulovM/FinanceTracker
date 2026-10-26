@@ -1,73 +1,61 @@
-# React + TypeScript + Vite
+# Finance Tracker — веб-клиент
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+SPA на React 19 + TypeScript + Vite 7 для REST API из корня репозитория. Общее описание проекта, API и запуск через Docker — в [корневом README](../README.md).
 
-Currently, two official plugins are available:
+## Стек
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- React 19, React Router 7, TanStack Query 5;
+- Tailwind CSS 3 и компоненты shadcn/ui на Radix UI (`src/components/ui`);
+- react-hook-form + zod для форм, Recharts для графиков, Sonner для уведомлений.
 
-## React Compiler
+## Запуск
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```powershell
+npm ci
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Dev-сервер доступен на `http://localhost:3000`. Запросы `/api/*` проксируются на `http://localhost:8080` (префикс `/api` отбрасывается), поэтому достаточно запустить backend командой `go run ./cmd/api`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Чтобы обращаться к API напрямую, задайте адрес в `.env.local` (шаблон — [.env.example](.env.example)):
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```dotenv
+VITE_API_BASE_URL=http://localhost:8080
 ```
+
+Если переменная пуста, клиент использует `/api`. В Docker-образе этот путь обслуживает Nginx.
+
+## Скрипты
+
+| Команда | Назначение |
+| --- | --- |
+| `npm run dev` | dev-сервер Vite |
+| `npm run build` | production-сборка в `dist/public` |
+| `npm run preview` | предпросмотр сборки |
+| `npm run check` | проверка типов (`tsc -b`) |
+| `npm run lint` | ESLint |
+| `npm run format` | Prettier |
+| `npm run test` | Vitest (тестов пока нет, запуск с `--passWithNoTests`) |
+
+## Структура
+
+```text
+src/
+├── App.tsx              # маршруты и ProtectedRoute
+├── main.tsx             # точка входа
+├── pages/               # Dashboard, Transactions, Accounts, Analytics, Budgets,
+│                        # Goals, Recurring, Settings, Help, Login, Register, NotFound
+├── components/
+│   ├── layout/          # AppLayout, Sidebar
+│   ├── shared/          # AccountCard, BudgetProgress, MetricCard, TransactionRow
+│   └── ui/              # компоненты shadcn/ui
+├── hooks/               # useAuth, use-mobile
+├── providers/query.tsx  # QueryClientProvider
+└── lib/
+    ├── api.ts           # REST-клиент, токен, преобразование данных API <-> UI
+    └── utils.ts
+```
+
+Все страницы, кроме `/login` и `/register`, доступны только авторизованному пользователю: иначе происходит редирект на `/login`. JWT хранится в `localStorage` (`auth_token`), идентификатор пользователя берётся из его payload (`user_id`).
+
+Алиас `@` указывает на `src`, поэтому импорты выглядят как `@/components/ui/button`.
