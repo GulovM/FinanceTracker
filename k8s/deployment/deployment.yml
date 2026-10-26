@@ -10,17 +10,32 @@ spec:
       app: my-app
   template:
     metadata:
-      labels: 
+      labels:
         app: my-app
     spec:
+      # API завершается, если БД недоступна при старте, поэтому ждём PostgreSQL (k8s/postgres/postgres.yml)
+      initContainers:
+        - name: wait-for-db
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z postgres 5432; do echo "waiting for postgres"; sleep 2; done
       containers:
         - name: app
           image: ghcr.io/gulovm/financetracker:sha-a6f8f0e
           ports:
             - containerPort: 80
+          # JWT_SECRET и параметры БД берутся из Secret app-env (шаблон: k8s/secret/secret.example.yml)
           envFrom:
             - secretRef:
                 name: app-env
           env:
             - name: CORS_ALLOWED_ORIGIN
               value: "*"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 5

@@ -145,7 +145,9 @@ Workflow [.github/workflows/ci.yml](.github/workflows/ci.yml) запускает
 
 - `deployment.yml` берёт `JWT_SECRET` и параметры БД из `Secret` `app-env` (`envFrom`), а `CORS_ALLOWED_ORIGIN` задаёт значением. Шаблон Secret — [k8s/secret/secret.example.yml](k8s/secret/secret.example.yml). Создайте его в кластере один раз вручную с реальными значениями (команда `kubectl create secret generic app-env -n production ...` приведена в шаблоне) и не коммитьте настоящий Secret. Без этого Secret pod не запустится. `PORT` задавать не нужно: Nginx проксирует на порт API по умолчанию `8080`. Не вшивайте секреты в образ: он публикуется в GHCR;
 - [k8s/service/service.yml](k8s/service/service.yml) создаёт `Service` `my-service` типа NodePort: порт 8088 в кластере, nodePort `30080`, целевой порт контейнера 80. Манифест не применяется workflow автоматически — выполните `kubectl apply -f k8s/service/service.yml` вручную, а права `github-deployer` на `services` уже есть в роли;
-- PostgreSQL и `Ingress` в манифестах отсутствуют, БД нужно развернуть отдельно;
+- PostgreSQL запускается отдельно от приложения: [k8s/postgres/postgres.yml](k8s/postgres/postgres.yml) содержит `StatefulSet` (одна реплика) и headless-`Service` `postgres`, а данные лежат на PVC `app-data` из [k8s/pvc/pvc.yml](k8s/pvc/pvc.yml). В Secret `app-env` задайте `DB_HOST=postgres:5432`. Приложение ждёт доступности БД в `initContainer`. У StorageClass `standard` политика `Delete`, поэтому удаление PVC стирает данные;
+- порядок первого развёртывания (CI применяет только `deployment.yml`): `kubectl apply -f k8s/secret/secret.yml -f k8s/pvc/pvc.yml -f k8s/postgres/postgres.yml -f k8s/service/service.yml`, затем деплой из CI. Локальный `secret.yml` создаётся из шаблона и находится в `.gitignore`;
+- `Ingress` в манифестах нет;
 - образ в манифесте указан с фиксированным тегом; актуальный тег выставляет шаг `kubectl set image`.
 
 ## Проверка качества
