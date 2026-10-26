@@ -17,7 +17,7 @@ import (
 func Run() {
 	log := logger.Init()
 
-	if err := godotenv.Load("D:\\Desktop\\Project\\internal\\config\\.env"); err != nil {
+	if err := godotenv.Load(".env", "internal/config/.env"); err != nil {
 		log.Warn().Err(err).Msg("ошибка в загрузке .env, будут использоваться текущие настройки окружения")
 	}
 

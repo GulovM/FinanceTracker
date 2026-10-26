@@ -13,10 +13,10 @@ import (
 func NewPostgresPgxConf() (*pgxpool.Pool, error) {
 	ctx := context.Background()
 
-	user := os.Getenv("DB_USER")
-	pass := os.Getenv("DB_PASSWORD")
+	user := os.Getenv("POSTGRES_USER")
+	pass := os.Getenv("POSTGRES_PASSWORD")
 	host := os.Getenv("DB_HOST")
-	name := os.Getenv("DB_NAME")
+	name := os.Getenv("POSTGRES_DB")
 
 	dsn := fmt.Sprintf("postgres://%s:%s@%v/%s", user, pass, host, name)
 	conn, err := pgxpool.New(ctx, dsn)

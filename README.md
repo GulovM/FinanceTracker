@@ -79,10 +79,10 @@ Get-ChildItem .\internal\db\migrations\*.sql |
 Создайте файл `internal/config/.env`:
 
 ```dotenv
-DB_USER=finance_user
-DB_PASSWORD=change_me
+POSTGRES_USER=finance_user
+POSTGRES_PASSWORD=change_me
 DB_HOST=localhost:5432
-DB_NAME=finance_tracker
+POSTGRES_DB=finance_tracker
 JWT_SECRET=replace-with-a-long-random-secret
 ```
 

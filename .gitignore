@@ -38,6 +38,7 @@ coverage/
 logs/
 tmp/
 temp/
+var/
 
 # IDE and OS files
 .vscode/

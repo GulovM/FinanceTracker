@@ -1,0 +1,22 @@
+services:
+  app:
+    build: .
+    image: my-app:latest
+    depends_on:
+      - db
+    env_file:
+      - ./internal/config/.env
+    ports:
+      - "8080:80"
+  
+  db:
+    image: postgres:16-alpine
+    env_file:
+      - ./internal/config/.env
+    volumes:
+      - ./var/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finance_user -d finance_tracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

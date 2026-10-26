@@ -1,0 +1,33 @@
+# Git & IDE
+.git
+.gitignore
+.vscode
+.idea
+
+# Go кэш и временные файлы
+.gocache
+.gomodcache
+.gotmp
+bin/
+*.exe
+*.test
+*.out
+
+# Node.js / Frontend артефакты (собираются с нуля внутри контейнера)
+app/node_modules
+app/dist
+app/.vite
+app/.vite-temp
+
+# Логи и временные файлы
+*.log
+logs/
+tmp/
+temp/
+var/
+
+# Конфигурации и секреты
+.env
+.env.*
+internal/config/.env
+
