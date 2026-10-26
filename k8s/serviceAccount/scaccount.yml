@@ -1,0 +1,42 @@
+# 1. Создаем ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: github-deployer
+  namespace: production
+---
+# 2. Роль с правами на управление подами, сервисами и деплойментами в namespace production
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: github-deployer-role
+  namespace: production
+rules:
+  - apiGroups: ["", "apps", "extensions"]
+    resources: ["deployments", "services", "pods", "replicasets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+# 3. Привязка роли к ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: github-deployer-binding
+  namespace: production
+subjects:
+  - kind: ServiceAccount
+    name: github-deployer
+    namespace: production
+roleRef:
+  kind: Role
+  name: github-deployer-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# 4. Создание постоянного токена для ServiceAccount (для k8s >= 1.24)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: github-deployer-token
+  namespace: production
+  annotations:
+    kubernetes.io/service-account.name: github-deployer
+type: kubernetes.io/service-account-token
